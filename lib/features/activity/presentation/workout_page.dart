@@ -31,6 +31,9 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   bool _starting = false;
   bool _gpsEnabled = false;
 
+  /// Web app: the session counts time only, with no location at all.
+  bool get _timed => widget.controller.timedWorkouts;
+
   @override
   void initState() {
     super.initState();
@@ -60,7 +63,8 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     });
     var enabled = false;
     try {
-      if (await Geolocator.isLocationServiceEnabled()) {
+      // Timed mode (web app) never asks for location.
+      if (!_timed && await Geolocator.isLocationServiceEnabled()) {
         var permission = await Geolocator.checkPermission();
         if (permission == LocationPermission.denied) {
           permission = await Geolocator.requestPermission();
@@ -124,7 +128,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     });
     setState(() {
       _starting = false;
-      if (!enabled) {
+      if (!enabled && !_timed) {
         _message =
             'Lokasi belum aktif. Misi jalan/lari dihitung dari jarak GPS, '
             'jadi nyalakan lokasi dulu. Rute tidak disimpan.';
@@ -156,7 +160,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
         ? 'Quest selesai: ${result.completed.join(', ')}.'
         : result.partial.isNotEmpty
         ? 'Tercapai sebagian: ${result.partial.join(', ')}. Tetap tercatat.'
-        : _meters < 1
+        : _meters < 1 && !_timed
         ? 'Sesi tercatat, tapi jarak belum terhitung. Misi jalan/lari butuh '
               'lokasi aktif.'
         : 'Sesi tercatat.';
@@ -244,9 +248,13 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 6),
             Text(
-              'Setelah mulai, boleh kunci layar atau buka aplikasi lain; '
-              'jarak tetap dihitung. Lokasi hanya dipakai selama sesi dan '
-              'rute tidak disimpan. Berhenti jika pusing atau nyeri.',
+              _timed
+                  ? 'Di aplikasi web, misi jalan/lari dihitung dari lama sesi. '
+                        'Setelah mulai, boleh kunci layar; waktunya tetap '
+                        'berjalan. Berhenti jika pusing atau nyeri.'
+                  : 'Setelah mulai, boleh kunci layar atau buka aplikasi lain; '
+                        'jarak tetap dihitung. Lokasi hanya dipakai selama sesi '
+                        'dan rute tidak disimpan. Berhenti jika pusing atau nyeri.',
               style: TextStyle(color: context.colors.muted, height: 1.4),
             ),
             const SizedBox(height: 24),
@@ -298,21 +306,23 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                     'waktu aktif',
                     style: TextStyle(color: context.colors.muted),
                   ),
-                  const SizedBox(height: 22),
-                  Text(
-                    '${(_meters / 1000).toStringAsFixed(2)} km',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: context.colors.accent,
+                  if (!_timed) ...[
+                    const SizedBox(height: 22),
+                    Text(
+                      '${(_meters / 1000).toStringAsFixed(2)} km',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: context.colors.accent,
+                      ),
                     ),
-                  ),
-                  Text(
-                    _gpsEnabled
-                        ? 'jarak GPS perkiraan'
-                        : 'jarak belum tersedia',
-                    style: TextStyle(color: context.colors.muted),
-                  ),
+                    Text(
+                      _gpsEnabled
+                          ? 'jarak GPS perkiraan'
+                          : 'jarak belum tersedia',
+                      style: TextStyle(color: context.colors.muted),
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -1,5 +1,5 @@
 {
-  "APP_NAME": "YouWell",
+  "APP_NAME": "YouWELL",
   "APP_ENV": "production",
   "LOCAL_STORAGE_KEY": "youwell.local.v3",
   "SHOW_PREVIEW_TOOLS": "false",

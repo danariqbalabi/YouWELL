@@ -26,6 +26,13 @@ class ActivityPage extends StatelessWidget {
       0,
       (sum, row) => sum + ((row['meters'] as num?)?.toInt() ?? 0),
     );
+    final minutes =
+        todayWorkouts.fold<int>(
+          0,
+          (sum, row) => sum + ((row['seconds'] as num?)?.toInt() ?? 0),
+        ) ~/
+        60;
+    final timed = controller.timedWorkouts;
     // The open quest each action below finishes, shown on that action.
     Map<String, dynamic>? openQuest(Set<String> kinds) => controller.quests
         .where(
@@ -53,10 +60,12 @@ class ActivityPage extends StatelessWidget {
               child: _TodayMetric(
                 icon: Icons.directions_walk_rounded,
                 color: c.body,
-                value: meters >= 1000
+                value: timed
+                    ? '$minutes mnt'
+                    : meters >= 1000
                     ? '${(meters / 1000).toStringAsFixed(1).replaceAll('.', ',')} km'
                     : '$meters m',
-                label: 'jarak hari ini',
+                label: timed ? 'gerak hari ini' : 'jarak hari ini',
               ),
             ),
             const SizedBox(width: 10),
@@ -77,7 +86,9 @@ class ActivityPage extends StatelessWidget {
           icon: Icons.directions_run_rounded,
           color: c.body,
           title: 'Jalan atau lari',
-          detail: 'Boleh kunci layar. Rute tidak disimpan.',
+          detail: timed
+              ? 'Dihitung dari waktu. Boleh kunci layar.'
+              : 'Boleh kunci layar. Rute tidak disimpan.',
           quest: moveQuest,
           onTap: () => _open(context, WorkoutPage(controller: controller)),
         ),

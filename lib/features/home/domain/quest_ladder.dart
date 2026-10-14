@@ -14,6 +14,8 @@ class LadderRung {
     this.photoCount,
     this.photoWindows,
     this.anytimeTitle,
+    this.timedTitle,
+    this.timedMinutes,
     this.strenuous = false,
   });
   final String title, description;
@@ -30,6 +32,11 @@ class LadderRung {
   /// passed when today's cards are made (e.g. breakfast after 10.00).
   final String? anytimeTitle;
 
+  /// Walk/run quest by session time, for builds without background GPS
+  /// (the iPhone web app). Same step, so research ladder positions match.
+  final String? timedTitle;
+  final int? timedMinutes;
+
   /// Shows "berhenti jika pusing atau nyeri" on the quest.
   final bool strenuous;
 }
@@ -45,7 +52,8 @@ const ladderLabels = {
 /// Low-impact users never enter the running part of the Body ladder.
 const lowImpactBodyMax = 4;
 
-/// Walk/run quests count GPS distance only; time alone never finishes them.
+/// Walk/run quests count GPS distance only; time alone never finishes them,
+/// except in the web app, which uses each rung's [LadderRung.timedTitle].
 const ladders = <String, List<LadderRung>>{
   'Body': [
     LadderRung(
@@ -54,6 +62,8 @@ const ladders = <String, List<LadderRung>>{
       durationMinutes: 5,
       activityKind: 'walk',
       targetMeters: 400,
+      timedTitle: 'Jalan 5 menit',
+      timedMinutes: 5,
     ),
     LadderRung(
       title: 'Jalan 800 m',
@@ -61,6 +71,8 @@ const ladders = <String, List<LadderRung>>{
       durationMinutes: 10,
       activityKind: 'walk',
       targetMeters: 800,
+      timedTitle: 'Jalan 10 menit',
+      timedMinutes: 10,
     ),
     LadderRung(
       title: 'Jalan cepat 1,2 km',
@@ -68,6 +80,8 @@ const ladders = <String, List<LadderRung>>{
       durationMinutes: 15,
       activityKind: 'walk',
       targetMeters: 1200,
+      timedTitle: 'Jalan cepat 15 menit',
+      timedMinutes: 15,
       strenuous: true,
     ),
     LadderRung(
@@ -76,6 +90,8 @@ const ladders = <String, List<LadderRung>>{
       durationMinutes: 20,
       activityKind: 'walk',
       targetMeters: 1500,
+      timedTitle: 'Jalan 20 menit',
+      timedMinutes: 20,
       strenuous: true,
     ),
     LadderRung(
@@ -84,6 +100,8 @@ const ladders = <String, List<LadderRung>>{
       durationMinutes: 20,
       activityKind: 'run',
       targetMeters: 2000,
+      timedTitle: 'Interval jalan-lari 20 menit',
+      timedMinutes: 20,
       strenuous: true,
     ),
     LadderRung(
@@ -92,6 +110,8 @@ const ladders = <String, List<LadderRung>>{
       durationMinutes: 25,
       activityKind: 'run',
       targetMeters: 2500,
+      timedTitle: 'Interval jalan-lari 25 menit',
+      timedMinutes: 25,
       strenuous: true,
     ),
     LadderRung(
@@ -100,6 +120,8 @@ const ladders = <String, List<LadderRung>>{
       durationMinutes: 16,
       activityKind: 'run',
       targetMeters: 2000,
+      timedTitle: 'Lari santai 20 menit',
+      timedMinutes: 20,
       strenuous: true,
     ),
     LadderRung(
@@ -108,6 +130,8 @@ const ladders = <String, List<LadderRung>>{
       durationMinutes: 24,
       activityKind: 'run',
       targetMeters: 3000,
+      timedTitle: 'Lari 25 menit',
+      timedMinutes: 25,
       strenuous: true,
     ),
     LadderRung(
@@ -116,6 +140,8 @@ const ladders = <String, List<LadderRung>>{
       durationMinutes: 30,
       activityKind: 'run',
       targetMeters: 4000,
+      timedTitle: 'Lari 30 menit',
+      timedMinutes: 30,
       strenuous: true,
     ),
     LadderRung(
@@ -124,6 +150,8 @@ const ladders = <String, List<LadderRung>>{
       durationMinutes: 38,
       activityKind: 'run',
       targetMeters: 5000,
+      timedTitle: 'Lari 40 menit',
+      timedMinutes: 40,
       strenuous: true,
     ),
   ],

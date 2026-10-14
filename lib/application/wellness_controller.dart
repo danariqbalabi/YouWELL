@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:youwell/core/config/app_mode.dart' as app_mode;
 import 'package:youwell/features/activity/domain/activity_evidence.dart';
 import 'package:youwell/core/types/json_map.dart';
 import 'package:youwell/core/utils/date_key.dart';
@@ -18,8 +19,12 @@ part 'wellness_gamification.dart';
 /// Single local-first state boundary shared by mobile and web.
 /// Remote auth and sync can later replace [persist] without changing the UI.
 class WellnessController extends ChangeNotifier {
-  WellnessController({String? saved, this.persist, DateTime Function()? clock})
-    : clock = clock ?? DateTime.now {
+  WellnessController({
+    String? saved,
+    this.persist,
+    DateTime Function()? clock,
+    this.timedWorkouts = app_mode.timedWorkouts,
+  }) : clock = clock ?? DateTime.now {
     if (saved != null) {
       try {
         _data = restoreWellnessState(saved);
@@ -38,6 +43,9 @@ class WellnessController extends ChangeNotifier {
 
   final Future<void> Function(String)? persist;
   final DateTime Function() clock;
+
+  /// Walk/run quests count session time instead of GPS distance (web app).
+  final bool timedWorkouts;
   JsonMap _data = createEmptyWellnessState();
   Future<void> _pending = Future.value();
   String? storageError;
@@ -332,6 +340,7 @@ class WellnessController extends ChangeNotifier {
     mobileThemes: _mobileRewardsEnabled,
     cameraAvailable: !cameraUnavailable,
     hour: now.hour,
+    timedWorkouts: timedWorkouts,
     recentAttempts: {
       for (final category in ladderCategories(reduction: reduction))
         category: _ladderQuestsBefore(

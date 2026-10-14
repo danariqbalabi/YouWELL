@@ -467,7 +467,9 @@ void main() {
       final summary = sim.controller.researchSummary(1).toJson();
       expect(summary.keys, [
         'week',
+        'opened_days',
         'active_days',
+        'active',
         'quests_done',
         'ladder_gerak',
         'ladder_istirahat',
@@ -476,11 +478,35 @@ void main() {
         'ladder_makan',
         'ladder_jeda',
         'delay_craving_count',
+        'delay_craving_completed',
         'habit_swap_count',
       ]);
       expect(summary['ladder_makan'], 2);
       expect(summary['ladder_jeda'], isNull);
     });
+
+    test(
+      'Matches the weekly log table: opens, active, Delay Craving',
+      () async {
+        final sim = Sim();
+        await sim.start(path: 'reduction');
+        // Opened on 3 days of week 1; nothing done on the third.
+        sim.doLadder(category: 'Reduction');
+        sim.nextDay();
+        sim.controller.recordHabitDelay();
+        sim.controller.recordHabitDelay(minutes: 2, completed: false);
+        sim.nextDay();
+        final week1 = sim.controller.researchSummary(1).toJson();
+        expect(week1['opened_days'], 3);
+        expect(week1['active'], isTrue);
+        expect(week1['delay_craving_count'], 2);
+        expect(week1['delay_craving_completed'], 1);
+
+        final week2 = sim.controller.researchSummary(2).toJson();
+        expect(week2['opened_days'], 0);
+        expect(week2['active'], isFalse);
+      },
+    );
 
     test('Age 18–22 on the vape path gets quit framing', () async {
       final young = Sim();

@@ -29,6 +29,8 @@ Fitur yang dievaluasi di penelitian:
 
 **Di luar cakupan:** versi rilis publik, analisis bisnis, *web workspace* (tidak dievaluasi), penyaringan konten berbasis AI, dan **machine learning** apa pun.
 
+**Distribusi (keputusan tim 8 Okt 2026):** Android lewat APK; iPhone lewat aplikasi web (tampilan HP, `MOBILE_WEB=true`) di Render yang dipasang lewat "Tambah ke Layar Utama", karena tim tidak memakai Apple Developer Program berbayar. *Web workspace* desktop tetap di luar cakupan.
+
 ---
 
 ## 2. Arsitektur target (hybrid, sudah dikunci di proposal)
@@ -81,7 +83,7 @@ Pengguna ↔ Aplikasi Flutter (HP)
    - Dasar: UU PDP Pasal 8 & 9.
 6. **research_logs (khusus partisipan UAT)**
    - Partisipan memasukkan kode P1 - P10 dan menyetujui pengiriman ringkasan.
-   - Seminggu sekali aplikasi mengirim **angka saja**: hari aktif, Core Quest selesai, posisi tangga per kategori, jumlah Delay Craving, jumlah Habit Swap.
+   - Seminggu sekali aplikasi mengirim **angka saja**: hari dibuka, hari aktif + status aktif, Core Quest selesai, posisi tangga per kategori, jumlah Delay Craving (total & selesai penuh), jumlah Habit Swap. Kolomnya mengikuti tabel log mingguan penelitian (keputusan 8 Okt 2026).
    - Tabel ini **tidak boleh** berisi `user_id`, email, alias, teks bebas, foto, atau lokasi.
 7. **Tangga quest (personalisasi adaptif)** → lihat §4.
 8. **Validasi quest** → lihat §5.
@@ -142,11 +144,15 @@ create table research_logs (
   id bigserial primary key,
   participant_code text check (participant_code ~ '^P([1-9]|10)$'),
   week int check (week between 1 and 4),
+  opened_days int,            -- "Frekuensi membuka aplikasi": hari app dibuka (0-7)
   active_days int,            -- hari app dibuka ATAU >= 1 misi selesai
+  active boolean,             -- "Status aktif": active_days > 0
   quests_done int,            -- termasuk misi latihan (hari Santai)
   ladder_gerak int, ladder_istirahat int, ladder_tidur int,
   ladder_hidrasi int, ladder_makan int, ladder_jeda int,
-  delay_craving_count int, habit_swap_count int,
+  delay_craving_count int,    -- semua pemakaian, termasuk timer dihentikan
+  delay_craving_completed int,-- timer selesai penuh
+  habit_swap_count int,
   submitted_at timestamptz default now()
 );
 ```
@@ -242,6 +248,7 @@ Dasar teori di proposal: *graded tasks* (BCT Ontology, Marques et al., 2024), as
 - Jika tercapai sebagian, catat "selesai sebagian". Data ini masuk ke aturan tangga.
 - Yang disimpan hanya meter & durasi. **Rute tidak disimpan.**
 - Sesi tetap berjalan saat layar terkunci atau aplikasi di latar belakang (Android: foreground service + notifikasi; iOS: `UIBackgroundModes` location + indikator biru). Izin tetap *when in use*, tidak meminta izin lokasi "selalu".
+- **Versi web (peserta iPhone, keputusan tim 8 Okt 2026):** tidak ada GPS. Misi jalan/lari dihitung dari **lama sesi** (`timedWorkouts`, `LadderRung.timedTitle`), anak tangga tetap sama. Lihat README "Distribusi untuk peserta".
 
 **Delay Craving:**
 

@@ -14,6 +14,7 @@ class ResearchSummary {
     required this.ladderMakan,
     required this.ladderJeda,
     required this.delayCravingCount,
+    required this.delayCravingCompleted,
     required this.habitSwapCount,
     required this.openedDayCount,
     required this.activityDayCount,
@@ -77,11 +78,16 @@ class ResearchSummary {
       ladderMakan: (historicalSteps?['Food'] as num?)?.toInt(),
       ladderJeda: (historicalSteps?['Reduction'] as num?)?.toInt(),
       delayCravingCount: habitDelays.where((row) => inWeek(row['day'])).length,
+      // A stopped timer still counts as use; this is only the full ones.
+      delayCravingCompleted: habitDelays
+          .where((row) => inWeek(row['day']) && row['completed'] != false)
+          .length,
       habitSwapCount: habitSwaps.where((row) => inWeek(row['day'])).length,
     );
   }
 
-  final int week, activeDays, questsDone, delayCravingCount, habitSwapCount;
+  final int week, activeDays, questsDone, habitSwapCount;
+  final int delayCravingCount, delayCravingCompleted;
   final int openedDayCount, activityDayCount, questDayCount;
 
   /// Ladder position per category; null when the category is not in use.
@@ -92,10 +98,13 @@ class ResearchSummary {
   /// to research names here: Body → gerak, Energy → istirahat,
   /// Lifestyle → hidrasi, Food → makan, Reduction → jeda. Tidur is not used
   /// yet. `quests_done` includes practice quests from relaxed days but not
-  /// Kartu Bonus extras (§10).
+  /// Kartu Bonus extras (§10). `opened_days` is the "Frekuensi membuka
+  /// aplikasi" column (days opened, 0–7); `active` is "Status aktif".
   JsonMap toJson() => {
     'week': week,
+    'opened_days': openedDayCount,
     'active_days': activeDays,
+    'active': activeDays > 0,
     'quests_done': questsDone,
     'ladder_gerak': ladderGerak,
     'ladder_istirahat': ladderIstirahat,
@@ -104,6 +113,7 @@ class ResearchSummary {
     'ladder_makan': ladderMakan,
     'ladder_jeda': ladderJeda,
     'delay_craving_count': delayCravingCount,
+    'delay_craving_completed': delayCravingCompleted,
     'habit_swap_count': habitSwapCount,
   };
 }

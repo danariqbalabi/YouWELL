@@ -89,7 +89,7 @@ Setiap kategori punya `maxStep` sendiri. XP misi tangga = **15 + 5 × anak tangg
 
 ### 5.1 🚶 Gerak (maxStep 10; *low-impact* maksimal 4)
 
-**Semua misi dihitung dari jarak GPS.** Waktu saja tidak pernah menyelesaikan misi (tidak ada jalan pintas durasi). Tanpa izin lokasi, misi Gerak tidak bisa selesai; aplikasi meminta lokasi dinyalakan dengan teks "Rute tidak disimpan". Sesi tetap menghitung jarak saat layar terkunci atau aplikasi di latar belakang.
+**Semua misi dihitung dari jarak GPS.** Waktu saja tidak pernah menyelesaikan misi (tidak ada jalan pintas durasi). Tanpa izin lokasi, misi Gerak tidak bisa selesai; aplikasi meminta lokasi dinyalakan dengan teks "Rute tidak disimpan". Sesi tetap menghitung jarak saat layar terkunci atau aplikasi di latar belakang. **Versi web (iPhone):** browser tidak bisa melacak GPS saat layar terkunci, jadi setiap anak tangga punya kembaran berbasis waktu (400 m ↔ 5 menit … 5 km ↔ 40 menit) dan misi selesai dari lama sesi.
 
 | # | Misi | Target jarak | Perkiraan waktu |
 |---|---|---|---|
@@ -328,7 +328,10 @@ ladder_gerak, ladder_tidur, ladder_hidrasi, ladder_makan, ladder_jeda
 ```
 
 **Aturan perhitungan:**
+- `opened_days`: jumlah **hari** aplikasi dibuka dalam minggu itu (0–7). Ini kolom "Frekuensi membuka aplikasi" di tabel log; yang dihitung hari, bukan berapa kali dibuka.
 - `active_days`: hari aplikasi **dibuka** atau ≥ 1 misi selesai. Ini sesuai definisi "aktif" di proposal.
+- `active`: `active_days` > 0 (kolom "Status aktif ya/tidak").
+- `delay_craving_count`: semua pemakaian Delay Craving, termasuk timer yang dihentikan ("ditunda X menit", bukan kegagalan). `delay_craving_completed`: hanya timer yang selesai penuh.
 - `quests_done`: semua misi kartu yang selesai, **termasuk** misi latihan di hari Santai, **tidak termasuk** misi Kartu Bonus. Misi latihan hanya dikecualikan dari evaluasi tangga.
 - `ladder_makan` terisi dari tangga Makan; `ladder_tidur` masih kosong sampai Tidur & Bangun dibuat.
 

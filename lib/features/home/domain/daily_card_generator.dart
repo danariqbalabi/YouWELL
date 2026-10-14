@@ -24,6 +24,7 @@ class DailyCardGenerator {
     bool cameraAvailable = true,
     int hour = 0,
     Map<String, int> recentAttempts = const {},
+    bool timedWorkouts = false,
   }) {
     final combos = _combos(today, reduction, recentAttempts);
     final order = [...sizes]
@@ -47,6 +48,7 @@ class DailyCardGenerator {
             hour: hour,
             cameraAvailable: cameraAvailable,
             practice: relaxed,
+            timedWorkouts: timedWorkouts,
           ),
       ];
       final sides = _sideQuests(
@@ -196,8 +198,11 @@ class DailyCardGenerator {
     required int hour,
     required bool cameraAvailable,
     required bool practice,
+    required bool timedWorkouts,
   }) {
     final rung = ladders[category]![step - 1];
+    // Without background GPS (web app), walk/run counts session time.
+    final timed = timedWorkouts && rung.timedTitle != null;
     // A meal window that has already passed gets the same-step anytime quest.
     final windowPassed =
         rung.photoWindows?.any((window) => window[1] <= hour) ?? false;
@@ -208,20 +213,27 @@ class DailyCardGenerator {
       'catalogId': 'ladder-${category.toLowerCase()}',
       'ladder': category,
       'step': step,
-      'title': anytime ? rung.anytimeTitle : rung.title,
-      'description': anytime
+      'title': timed
+          ? rung.timedTitle
+          : anytime
+          ? rung.anytimeTitle
+          : rung.title,
+      'description': timed
+          ? 'Dihitung dari lama sesi. Boleh kunci layar selama sesi.'
+          : anytime
           ? 'Jam makannya sudah lewat, jadi hari ini cukup ini. Foto tiap porsinya.'
           : rung.description,
       'category': category,
       'difficulty': step,
-      'durationMinutes': rung.durationMinutes,
+      'durationMinutes': timed ? rung.timedMinutes : rung.durationMinutes,
       'xp': 15 + step * 5,
       'source': 'card',
       'status': 'available',
       'done': false,
       // Without a camera, photo quests are checked off instead (§7).
       if (!photo || cameraAvailable) 'activityKind': ?rung.activityKind,
-      'targetMeters': ?rung.targetMeters,
+      if (!timed) 'targetMeters': ?rung.targetMeters,
+      if (timed) 'timed': true,
       'delayMinutes': ?rung.delayMinutes,
       'waterMl': ?rung.waterMl,
       if (photo && cameraAvailable) 'photoCount': rung.photoCount ?? 1,

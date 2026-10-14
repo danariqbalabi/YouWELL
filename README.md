@@ -1,4 +1,4 @@
-# YouWell
+# YouWELL
 
 YouWell adalah **better-life companion** untuk membangun ritme harian lewat
 langkah kecil, companion, dan progress yang tidak menghukum. Produk saat ini
@@ -82,6 +82,27 @@ perubahan lokal.
 Konfigurasi lokal ada di `config/env/development.json` dan diabaikan Git.
 Salin dari `config/env/development.example.json` setelah clone.
 
+## Distribusi untuk peserta
+
+- **Android:** APK dari `flutter build apk --release` (butuh Android SDK).
+- **iPhone:** aplikasi web di Render, tanpa App Store/TestFlight. Peserta
+  membuka link di Safari → **Bagikan → Tambah ke Layar Utama**, lalu membuka
+  YouWELL dari ikonnya (layar penuh).
+
+Deploy web memakai [`render.yaml`](render.yaml) (static site gratis). Build-nya
+menjalankan `scripts/render-build.sh`, yang memasang Flutter lalu membangun
+tampilan HP (`--dart-define=MOBILE_WEB=true`). Isi `SUPABASE_URL` dan
+`SUPABASE_PUBLISHABLE_KEY` di dashboard Render; keduanya memang publik.
+**Jangan pernah** memasukkan service role key.
+
+Perbedaan versi web iPhone:
+
+- Browser menghentikan GPS saat layar terkunci, jadi misi jalan/lari dihitung
+  dari **lama sesi**, bukan jarak. Anak tangganya sama (Jalan 400 m ↔ Jalan
+  5 menit), sehingga `ladder_gerak` tetap sebanding dengan Android.
+- Foto Meal Snap dipakai sebagai bukti saat check-in lalu dibuang.
+- Data lokal terhapus jika ikon dihapus, jadi sinkronisasi Supabase wajib.
+
 ## File utama
 
 Jika **Jalur kurangi rokok / vape** aktif di **Profil & Settings > Preferensi**,
@@ -118,6 +139,9 @@ quest pada kartu harian berikutnya mengikuti jalur yang aktif.
 flutter analyze
 flutter test
 flutter build web --release --no-web-resources-cdn \
+  --dart-define-from-file=config/env/development.example.json
+# Tampilan HP untuk iPhone (sama seperti build Render)
+flutter build web --release --no-web-resources-cdn --dart-define=MOBILE_WEB=true \
   --dart-define-from-file=config/env/development.example.json
 flutter build ios --simulator --no-codesign \
   --dart-define-from-file=config/env/development.example.json

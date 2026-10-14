@@ -4,8 +4,14 @@ import 'package:youwell/core/types/json_map.dart';
 /// A controller with a movable clock for multi-day challenge tests.
 /// Starts in the evening so every quest can be finished the same day.
 class Sim {
+  /// [timed]: walk/run counts session time, as in the web app.
+  Sim({this.timed = false});
+  final bool timed;
   DateTime now = DateTime(2026, 10, 24, 20);
-  late final controller = WellnessController(clock: () => now);
+  late final controller = WellnessController(
+    clock: () => now,
+    timedWorkouts: timed,
+  );
 
   Future<void> start({
     String path = 'wellness',

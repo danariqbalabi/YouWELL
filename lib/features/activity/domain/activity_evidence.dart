@@ -32,7 +32,8 @@ abstract final class ActivityEvidence {
           final meters = (row['meters'] as num?)?.toInt() ?? 0;
           final seconds = (row['seconds'] as num?)?.toInt() ?? 0;
           // Distance quests need real GPS meters; time never stands in.
-          // Only quests saved before distance targets fall back to time.
+          // Timed quests (web app, no background GPS) and quests saved
+          // before distance targets count session time.
           return sum +
               (targetMeters != null && targetMeters > 0
                   ? meters / targetMeters

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/config/app_environment.dart';
+import 'package:youwell/core/config/app_mode.dart';
 import 'package:youwell/data/repositories/local_wellness_repository.dart';
 import 'youwell_app.dart';
 
@@ -11,7 +12,7 @@ Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
   final localRepository = LocalWellnessRepository(
     await SharedPreferences.getInstance(),
-    storageKey: kIsWeb && const bool.fromEnvironment('MOBILE_PREVIEW')
+    storageKey: mobilePreview
         ? '${AppEnvironment.storageKey}.mobile-preview'
         : AppEnvironment.storageKey,
   );

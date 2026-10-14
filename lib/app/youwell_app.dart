@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:youwell/app/app_shell.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/config/app_environment.dart';
+import 'package:youwell/core/config/app_mode.dart';
 import 'package:youwell/core/theme/app_theme.dart';
 import 'package:youwell/core/theme/appearance_scope.dart';
 import 'package:youwell/features/onboarding/presentation/onboarding_page.dart';
@@ -10,8 +11,8 @@ import 'package:youwell/features/web/presentation/public_recap_page.dart';
 import 'package:youwell/features/web/presentation/web_landing_page.dart';
 import 'package:youwell/features/web/presentation/web_workspace_page.dart';
 
-const _mobilePreview = kIsWeb && bool.fromEnvironment('MOBILE_PREVIEW');
-const _webWorkspace = kIsWeb && !_mobilePreview;
+const _mobilePreview = mobilePreview;
+const _webWorkspace = kIsWeb && !mobilePreview && !mobileWeb;
 
 /// Local-first application root for the current web design phase.
 class YouWellApp extends StatelessWidget {
