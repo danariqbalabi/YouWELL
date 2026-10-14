@@ -1,4 +1,5 @@
 import 'package:youwell/core/types/json_map.dart';
+import 'package:youwell/features/home/domain/wellness_uat_program.dart';
 
 /// Graded, rule-based quest ladders (no ML). Each category keeps its own step;
 /// the step decides which quest of that category appears on a daily card.
@@ -370,9 +371,18 @@ List<String> ladderCategories({required bool reduction}) =>
 /// Ladder quests per card: 3 random healthy categories, or Jeda + 2 random.
 const ladderQuestsPerCard = 3;
 
-int ladderMax(String category, {required bool lowImpact}) {
+int ladderMax(
+  String category, {
+  required bool lowImpact,
+  bool wellnessUat = false,
+}) {
   final length = ladders[category]!.length;
-  return category == 'Body' && lowImpact ? lowImpactBodyMax : length;
+  final limit = wellnessUat
+      ? WellnessUatProgram.stepLimits[category] ?? length
+      : length;
+  return category == 'Body' && lowImpact
+      ? lowImpactBodyMax.clamp(1, limit)
+      : limit.clamp(1, length);
 }
 
 /// The rule from the proposal (§4), evaluated per category every 7 days.

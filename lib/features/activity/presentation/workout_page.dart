@@ -146,6 +146,17 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
 
   void _finish() {
     _pause();
+    if (widget.controller.wellnessProgramComplete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Perjalanan 28 hari selesai. Sesi ini tidak menambah challenge atau XP.',
+          ),
+        ),
+      );
+      Navigator.of(context).pop();
+      return;
+    }
     if (_watch.elapsed.inSeconds < 1) return;
     final result = widget.controller.recordWorkout(
       kind: _kind,

@@ -5,23 +5,37 @@ Daily Card adalah pintu masuk rencana harian. Satu kartu berisi satu paket quest
 ```text
 5 paket kartu tersaring sesuai path, pace, dan progres
         ↓
-spin acak → swipe/reveal 1 kartu → maksimal 1 kali ganti → commit
+buka rekomendasi atau spin/swipe → reveal → maksimal 1 kali ganti → commit
         ↓
 3–5 quest hari ini → complete → XP → companion tumbuh
 ```
 
-Setiap paket mencakup setidaknya satu quest Body, Energy, dan Lifestyle. Untuk
-path reduction, Lifestyle diganti Reduction/Habit Swap. Level ringan berisi 3
-quest, seimbang 4, dan lebih aktif 5. Pengguna baru atau dengan compliance rendah
-dimulai dari level ringan. Low-impact dan path menyaring pool sebelum lima paket
-dibentuk. Personalisasi masih rule-based dan dapat dijelaskan; belum ada machine
-learning.
+Setiap paket berisi tiga misi tangga dari kategori berbeda. WELLNESS memilih
+tiga dari Gerak, Makan, Hidrasi, Istirahat; path reduction tetap Jeda + dua
+kategori sehat. Deck Normal berisi 3/3/4/4/5 misi. Tempo awal 1/2/3 menentukan
+tangga awal dan ukuran rekomendasi 3/4/5, bukan mengunci semua kartu.
+
+WELLNESS UAT berlangsung 28 hari kalender, lalu rekap. Kenaikan opsional,
+menggunakan bukti pada tingkat saat ini, dengan tujuh hari sejak penerimaan.
+Gerak dibatasi jalan tanpa lari, Makan dua foto, Istirahat layar off 30 menit,
+dan Hidrasi sampai tangga 2.000 ml. Lihat batas lengkap di CHALLENGE_SPEC.
+Pengacakan ukuran menggunakan Fisher–Yates deterministik per tanggal.
+Kategori jarang diambil diprioritaskan; saat seri, rekomendasi memilih beban
+aktivitas lebih ringan. Waktu hidrasi/istirahat tidak ditampilkan sebagai sesi
+aktif yang harus dikerjakan sekaligus. Semua personalisasi berbasis aturan.
 
 Kartu yang dilewati menjadi abu-abu dan nonaktif. Paket yang telah di-commit
 tidak dapat diganti. Progress menghitung quest dalam paket terpilih tanpa streak
 reset atau freeze token. Draft lama tanpa quest selesai dimigrasikan tanpa
 menghapus air atau pilihan yang sudah dilewati; hari lama yang sudah dimainkan
 tetap dipertahankan.
+
+Saat konfirmasi WELLNESS, aktivitas valid yang telah dicatat pada hari yang
+sama ikut menyelesaikan misi. XP dan bonus Hari Penuh tetap sekali. Draft makan
+yang melewati batas waktu diperbarui sebelum konfirmasi; jika sudah direveal,
+pengguna melihat alternatif dan mengonfirmasi ulang. Kartu yang sudah diambil
+tidak berubah. Hari Santai berisi tiga misi satu tingkat lebih ringan dan
+tidak menjadi bukti untuk kenaikan tingkat.
 
 File utama:
 

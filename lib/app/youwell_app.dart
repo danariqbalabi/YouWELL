@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:youwell/app/app_shell.dart';
 import 'package:youwell/application/wellness_controller.dart';
@@ -7,28 +6,61 @@ import 'package:youwell/core/config/app_mode.dart';
 import 'package:youwell/core/theme/app_theme.dart';
 import 'package:youwell/core/theme/appearance_scope.dart';
 import 'package:youwell/features/onboarding/presentation/onboarding_page.dart';
-import 'package:youwell/features/web/presentation/public_recap_page.dart';
-import 'package:youwell/features/web/presentation/web_landing_page.dart';
-import 'package:youwell/features/web/presentation/web_workspace_page.dart';
+import 'package:youwell/features/community/presentation/admin_shell.dart';
 
-const _mobilePreview = mobilePreview;
-const _webWorkspace = kIsWeb && !mobilePreview && !mobileWeb;
-
-/// Local-first application root for the current web design phase.
-class YouWellApp extends StatelessWidget {
-  const YouWellApp({super.key, required this.controller});
+/// One codebase with separate moderator web and phone app entry points.
+class YouWellApp extends StatefulWidget {
+  const YouWellApp({super.key, required this.controller, this.surface});
 
   final WellnessController controller;
+  final AppSurface? surface;
+  @override
+  State<YouWellApp> createState() => _YouWellAppState();
+}
+
+class _YouWellAppState extends State<YouWellApp> {
+  WellnessController get controller => widget.controller;
+  late String _themePreference;
+  @override
+  void initState() {
+    super.initState();
+    _themePreference = controller.themePreference;
+    controller.addListener(_themeChanged);
+  }
+
+  // Quest and activity changes rebuild their screen, not the whole navigator.
+  void _themeChanged() {
+    if (_themePreference != controller.themePreference) {
+      setState(() => _themePreference = controller.themePreference);
+    }
+  }
+
+  @override
+  void didUpdateWidget(YouWellApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != controller) {
+      oldWidget.controller.removeListener(_themeChanged);
+      controller.addListener(_themeChanged);
+      _themePreference = controller.themePreference;
+    }
+  }
+
+  @override
+  void dispose() {
+    controller.removeListener(_themeChanged);
+    super.dispose();
+  }
+
+  AppSurface get _surface => widget.surface ?? appSurface;
+  bool get _mobilePreview => _surface == AppSurface.mobilePreview;
+  bool get _admin => _surface == AppSurface.admin;
+  Widget get _entry => _admin
+      ? AdminShell(controller: controller)
+      : _LocalAppEntry(controller: controller);
 
   @override
   Widget build(BuildContext context) {
-    final app = AppearanceScope(
-      controller: controller,
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (_, _) => _buildApp(),
-      ),
-    );
+    final app = AppearanceScope(controller: controller, child: _buildApp());
     if (!_mobilePreview) return app;
 
     // Keep the navigator and its dialogs inside a portrait phone viewport.
@@ -63,16 +95,16 @@ class YouWellApp extends StatelessWidget {
   }
 
   Widget _buildApp() => MaterialApp(
-    title: '${AppEnvironment.appName} • Little steps, better days',
+    title: _admin
+        ? '${AppEnvironment.appName} Admin'
+        : '${AppEnvironment.appName} • Little steps, better days',
     debugShowCheckedModeBanner: false,
-    // The web workspace keeps its own look; the phone app gets the
-    // reward-focused mobile theme.
-    theme: _webWorkspace
+    theme: _admin
         ? AppTheme.light
         : _mobilePreview
         ? AppTheme.mobileLight.copyWith(platform: TargetPlatform.iOS)
         : AppTheme.mobileLight,
-    darkTheme: _webWorkspace
+    darkTheme: _admin
         ? AppTheme.dark
         : _mobilePreview
         ? AppTheme.mobileDark.copyWith(platform: TargetPlatform.iOS)
@@ -83,31 +115,34 @@ class YouWellApp extends StatelessWidget {
       _ => ThemeMode.system,
     },
     routes: {
-      '/app': (_) => _LocalAppEntry(controller: controller),
-      '/recap': (_) => PublicRecapPage(controller: controller),
-      '/admin': (_) => _LocalAppEntry(controller: controller, isAdmin: true),
+      '/app': (_) => _entry,
+      '/admin': (_) => _admin ? _entry : const _AdminUnavailablePage(),
     },
-    home: _webWorkspace
-        ? _WebLandingEntry(controller: controller)
-        : _LocalAppEntry(controller: controller),
+    home: _entry,
   );
 }
 
-class _WebLandingEntry extends StatelessWidget {
-  const _WebLandingEntry({required this.controller});
-
-  final WellnessController controller;
-
+class _AdminUnavailablePage extends StatelessWidget {
+  const _AdminUnavailablePage();
   @override
-  Widget build(BuildContext context) =>
-      WebLandingPage(onJoin: () async => Navigator.pushNamed(context, '/app'));
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('YouWELL')),
+    body: const Center(
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Text(
+          'Moderasi tersedia melalui web admin.',
+          textAlign: TextAlign.center,
+        ),
+      ),
+    ),
+  );
 }
 
 class _LocalAppEntry extends StatelessWidget {
-  const _LocalAppEntry({required this.controller, this.isAdmin = false});
+  const _LocalAppEntry({required this.controller});
 
   final WellnessController controller;
-  final bool isAdmin;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -116,9 +151,7 @@ class _LocalAppEntry extends StatelessWidget {
       if (controller.profile == null) {
         return OnboardingPage(controller: controller);
       }
-      return _webWorkspace
-          ? WebWorkspacePage(controller: controller, isAdmin: isAdmin)
-          : AppShell(controller: controller);
+      return AppShell(controller: controller);
     },
   );
 }

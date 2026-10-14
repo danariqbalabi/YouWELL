@@ -9,13 +9,14 @@
 | Companion mobile | 5 tahap tumbuh, evolusi visual, lemari aksesori/latar, target hadiah berikutnya |
 | Reward mobile | Bonus Hari Penuh 20 XP sekali per hari, ID persisten, lencana privat |
 | Daily Card | Lima kartu collectible, spin acak, swipe, reveal, satu kali ganti, commit; mobile punya Santai/Normal dan tema |
+| WELLNESS UAT | 28 hari kalender, panduan empat minggu, batas latihan ringan, rekomendasi sebelum reveal, rekap setelah hari ke-28 |
 | Aktivitas mobile | Foto/catatan makan lokal, timer/GPS foreground, hidrasi, riwayat detail, koreksi/hapus |
 | Delay Craving & Habit Swap | Timer tunda sesuai anak tangga + catatan Habit Swap, khusus jalur rokok/vape. Dibuka dari Home. Reset dihapus dari mobile (keputusan tim 6 Okt 2026) |
 | Perjalanan mobile | Ritme 4/7, kalender 28 hari, lencana, tangga quest, XP, aktivitas, total menit ditunda |
 | Community mobile | Encouragement Wall lokal, post menunggu review, reaksi cepat, laporan; seed post berlabel contoh |
-| Admin | Antrean post pending, approve/reject, dan penyelesaian laporan |
+| Admin web | Antrean post pending, setujui/tolak, laporan; tanpa onboarding, storage demo terpisah |
 | Profile | Tema, path, low-impact, kurangi animasi, getaran, ekspor/hapus lokal, persetujuan dan kode UAT |
-| Web | Landing, Home workspace, Focus Station, Progress, public recap |
+| Web iPhone | AppShell mobile tanpa bingkai, timer gerak tanpa GPS, build Render tersendiri |
 
 ## Sengaja ditunda
 
@@ -29,23 +30,27 @@
 
 Tidak tersedia: estimasi kalori/AI makanan, upload foto ke cloud, tracking GPS
 background, komentar bebas, peringkat kompetitif, dan hukuman karena absen.
-Web tidak dirombak dalam revisi mobile ini.
+Workspace desktop, landing, Focus Station, dan recap publik sudah dihapus.
 
 ## Penyederhanaan mobile
 
 - Check-in energi dan panel energi dihapus; catatan lama tetap ikut ekspor lokal.
-- Fokus/Pomodoro hanya tersedia di web. Koleksi sesi fokus bersama dipertahankan.
+- Fokus/Pomodoro sudah dihapus dari UI. Koleksi sesi fokus lama tetap bisa diekspor.
 - Lima tema mobile: Gerak Ringan, Energi Segar, Istirahat, Hidrasi & Makan,
   Udara Segar. Quest pendamping produktivitas/relasi tidak masuk pool mobile.
 - Core Quest, tangga Istirahat/Hidrasi, dan quest reduction tetap ada.
   Pada jalur reduction, Energi Segar menyediakan Habit Swap/pemicu sesuai level.
 - Kartu yang sudah dibuka atau di-commit tidak diganti diam-diam.
+- Di WELLNESS, deadline makan yang lewat sebelum commit menampilkan alternatif
+  dan meminta konfirmasi ulang. ID kartu dan kesempatan ganti tetap sama.
+- Kenaikan WELLNESS dimulai dari tanggal penerimaan dan hanya menggunakan
+  bukti pada tingkat saat ini; aktivitas valid sebelum commit tetap dihitung.
 - Reset dihapus dari mobile; Delay Craving & Habit Swap dipindah ke halaman sendiri.
   Napas sebagai opsi Habit Swap tetap tersedia khusus jalur reduction.
 
 ## Aturan data dan penelitian
 
-- Reward mobile aktif saat AppShell mobile dipakai; layout/widget web tidak diubah.
+- Reward mobile aktif di Android dan web iPhone melalui AppShell.
 - Koreksi/hapus jurnal tidak mencabut XP dan tidak mencetak reward baru.
 - Durasi/jarak sesi gerak tidak bisa diedit, baik di UI maupun API controller;
   hanya catatan pribadi yang dapat diubah. Hapus sesi jika keliru.

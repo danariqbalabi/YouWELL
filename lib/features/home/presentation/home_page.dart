@@ -6,6 +6,7 @@ import 'package:youwell/features/companion/presentation/companion_page.dart';
 import 'package:youwell/features/companion/presentation/mobile_companion.dart';
 import 'package:youwell/features/home/domain/daily_card_generator.dart';
 import 'package:youwell/features/home/domain/quest_ladder.dart';
+import 'package:youwell/features/home/presentation/wellness_program_card.dart';
 import 'package:youwell/features/reduction/presentation/reduction_support_page.dart';
 import 'package:youwell/shared/widgets/game_widgets.dart';
 
@@ -57,34 +58,42 @@ class HomePage extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Hari ke-$dayNumber perjalananmu',
+          controller.wellnessUat
+              ? '28 hari membangun langkah kecil'
+              : 'Hari ke-$dayNumber perjalananmu',
           style: text.bodyMedium?.copyWith(
             color: c.muted,
             fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 20),
+        if (controller.wellnessUat) ...[
+          WellnessProgramCard(controller: controller),
+          const SizedBox(height: 16),
+        ],
         _PlayerCard(controller: controller, companionKey: companionKey),
         if (controller.ladderOffers.isNotEmpty) ...[
           const SizedBox(height: 16),
           _LadderBanner(controller: controller),
         ],
-        const SizedBox(height: 32),
-        _TodayHeader(controller: controller),
-        if (controller.quests.isEmpty && controller.needsDailyCardDraw)
-          _DrawPrompt(onOpenDraw: onOpenDraw)
-        else ...[
-          _FullDayMeter(controller: controller),
-          const SizedBox(height: 20),
-          for (final task in controller.coreQuests) questCard(task),
-          if (controller.canDrawBonusCard) ...[
-            const SizedBox(height: 8),
-            _BonusOffer(controller: controller),
-          ],
-          if (controller.bonusQuests.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            const SectionTitle('Kartu Bonus', icon: Icons.star_rounded),
-            for (final task in controller.bonusQuests) questCard(task),
+        if (!controller.wellnessProgramComplete) ...[
+          const SizedBox(height: 32),
+          _TodayHeader(controller: controller),
+          if (controller.quests.isEmpty && controller.needsDailyCardDraw)
+            _DrawPrompt(onOpenDraw: onOpenDraw)
+          else ...[
+            _FullDayMeter(controller: controller),
+            const SizedBox(height: 20),
+            for (final task in controller.coreQuests) questCard(task),
+            if (controller.canDrawBonusCard) ...[
+              const SizedBox(height: 8),
+              _BonusOffer(controller: controller),
+            ],
+            if (controller.bonusQuests.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              const SectionTitle('Kartu Bonus', icon: Icons.star_rounded),
+              for (final task in controller.bonusQuests) questCard(task),
+            ],
           ],
         ],
         if (controller.reduction) ...[

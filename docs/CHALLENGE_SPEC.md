@@ -4,6 +4,47 @@ Dokumen ini adalah pelengkap `CLAUDE.md` dan ditaruh di `docs/CHALLENGE_SPEC.md`
 
 **Aturan utama:** semua personalisasi berbasis aturan (*rule-based*) dan bisa dijelaskan ke pengguna. **Tanpa machine learning.**
 
+## Penyesuaian WELLNESS UAT 28 hari (14 Oktober 2026)
+
+Bagian ini mengikuti permintaan pengembang untuk demo satu bulan dan berlaku
+hanya pada path WELLNESS. Path rokok/vape akan dievaluasi pada tahap berikutnya.
+Tabel tangga lengkap di bawah tetap menjadi referensi jangka panjang.
+
+- Periode adalah 28 **hari kalender** sejak onboarding, bukan 28 hari aktif.
+  Melewatkan hari tidak mengulang periode. Hari ke-28 tetap dapat dikerjakan
+  sampai akhir hari; mulai hari ke-29 aplikasi menampilkan rekap empat minggu
+  dan tidak membuat challenge, bonus, atau catatan aktivitas baru.
+- Fokus mingguan: Mulai pelan → Ulangi langkah kecil → Temukan ritmemu →
+  Jaga yang cocok. Ini panduan, bukan empat tugas baru yang wajib selesai.
+- Arah ritme tetap satu misi pada 4 dari 7 hari; bonus Hari Penuh opsional.
+  XP dan progres yang sudah didapat tidak dicabut karena absen.
+- Tempo awal tetap 1/2/3. Batas UAT: Gerak 4 (jalan 1,5 km atau 20 menit web,
+  tanpa misi lari), Makan 5 (maksimal dua foto), Istirahat 4 (layar off 30 menit
+  tentang semalam), Hidrasi 5 (2.000 ml). Kenaikan bukan target wajib.
+- Ukuran deck tetap 3/3/4/4/5, dengan Fisher–Yates deterministik per tanggal.
+  Rekomendasi mengikuti tempo 3/4/5 misi, mengutamakan kategori yang jarang
+  diambil, lalu beban aktivitas lebih ringan. Rekomendasi dapat dibuka sebelum
+  reveal acak. Estimasi waktu aktivitas tidak menjumlahkan hidrasi atau jeda
+  layar semalam sebagai sesi kerja terus-menerus.
+- Naik tetap membutuhkan minimal 3 hari kategori diambil dan completion ≥80%.
+  **Hanya bukti dari anak tangga saat ini** yang dihitung. Menerima tawaran
+  memulai periode evaluasi baru selama tujuh hari, termasuk penerimaan terlambat.
+  Quest kartu yang sudah diambil sebelum naik tetap pada tingkat aslinya.
+- Saat kartu dikonfirmasi, air, foto valid, dan sesi gerak yang sudah dicatat
+  pada hari yang sama diperiksa. Bukti sebagian tampil sebagai progres; bukti
+  lengkap menyelesaikan quest dan memberikan XP sekali. Catatan tanpa foto,
+  GPS yang tidak valid, dan aktivitas hari sebelumnya tidak menjadi bukti.
+- Draft makan diperiksa lagi saat reveal/konfirmasi. Jika waktunya sudah lewat,
+  gunakan alternatif kapan saja di anak tangga yang sama. Kartu yang sudah
+  diambil tidak berubah. Jika deadline lewat setelah reveal, tampilkan versi
+  baru dan minta konfirmasi ulang tanpa menghabiskan kesempatan ganti.
+- Latihan hari Santai ikut menyeimbangkan kategori rekomendasi, tetapi tetap
+  tidak menjadi bukti untuk kenaikan tangga.
+- Misi tambahan/bonus tetap ringan (≤5 menit); Cahaya Pagi tidak ditawarkan
+  setelah tengah hari. Foto dan rute tetap mengikuti batas privasi sebelumnya.
+
+Regression tests dan simulasi 28 hari ada di `test/wellness_uat_test.dart`.
+
 ---
 
 ## 0. Prinsip desain (berlaku untuk semua misi)

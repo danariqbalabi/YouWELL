@@ -69,6 +69,7 @@ extension MobileWellnessRewards on WellnessController {
   }
 
   bool setDailyPace(String value) {
+    if (wellnessProgramComplete) return false;
     if (!const ['relaxed', 'normal'].contains(value) ||
         hasCommittedDailyCard ||
         selectedDailyCardId != null ||

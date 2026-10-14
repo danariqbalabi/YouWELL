@@ -58,7 +58,9 @@ class Sim {
         controller.recordWorkout(
           kind: task['activityKind'],
           // A steady 5 km/h walk, well under the 20 km/h limit.
-          seconds: (meters / 5000 * 3600).round() + 60,
+          seconds: task['timed'] == true
+              ? (task['durationMinutes'] as int) * 60
+              : (meters / 5000 * 3600).round() + 60,
           meters: meters,
         );
       case 'water':

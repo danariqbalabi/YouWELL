@@ -2,7 +2,7 @@ import http from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-const root = path.resolve('build/web');
+const root = path.resolve(process.argv[2] || 'build/web');
 const port = Number(process.env.PORT || 8080);
 if (!existsSync(path.join(root, 'index.html'))) {
   console.error('Build belum tersedia. Jalankan bash scripts/preview.sh.'); process.exit(1);

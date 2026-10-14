@@ -8,12 +8,29 @@ data cloud.
 ## Produk saat ini
 
 - Mobile: **Hari ini, Aktivitas, Perjalanan, Komunitas**; Profil dari avatar.
-- Web: landing, Home, Focus Station, Progress, Community, Admin, dan recap.
+- Android: aplikasi mobile melalui APK.
+- iPhone: aplikasi mobile melalui web Render (`MOBILE_WEB=true`).
+- Web admin: hanya antrean moderasi, setujui/tolak post, dan laporan; tanpa onboarding pengguna.
+- `MOBILE_PREVIEW=true`: alat pengembangan di browser desktop dengan bingkai HP.
 - Core loop: pilih 1 dari 5 Daily Card berisi 3–5 quest adaptif, selesaikan,
   dapatkan XP, dan tumbuhkan companion.
 - Path reduction opsional untuk habit swap rokok/vape; bukan identitas utama.
 
 ## Gamifikasi mobile
+
+WELLNESS UAT kini berlangsung **28 hari kalender** sejak onboarding. Empat
+minggunya memandu mulai pelan, pengulangan, menemukan ritme, dan mempertahankan
+kebiasaan yang cocok. Satu misi pada 4 dari 7 hari menjadi arah ritme, tanpa
+streak atau kenaikan wajib. Setelah hari ke-28 tersedia rekap dan riwayat,
+tanpa challenge baru. Path rokok/vape belum direvisi pada tahap ini.
+
+Gerak WELLNESS dibatasi sampai jalan 1,5 km / 20 menit web, tanpa lari; Makan
+sampai dua foto, Istirahat sampai layar off 30 menit, dan Hidrasi sampai tangga
+2.000 ml. Tempo awal tetap 1/2/3. Rekomendasi terlihat sebelum reveal; deck
+diacak konsisten per tanggal. Kenaikan memakai bukti pada tingkat saat ini
+dan berjarak minimal tujuh hari sejak penerimaan. Aktivitas hari ini yang
+sudah dicatat ikut dihitung saat memilih kartu; draft makan yang kedaluwarsa
+diperbarui sebelum konfirmasi. Detail ada di `docs/CHALLENGE_SPEC.md`.
 
 - Quest selesai: XP melayang menuju companion, respons senang, dan getaran
   opsional. Feedback berupa panel kecil bertema, bukan snackbar putih.
@@ -41,13 +58,16 @@ data cloud.
   Belum ada pengiriman otomatis atau cloud sync.
 - Mobile tidak menampilkan check-in energi atau timer fokus. Hidrasi ada di
   Aktivitas; Jeda fisik dibuka dari Home. Panduan postur/stretch/ubah posisi 60s
-  dan bantuan reduction tetap tersedia, sedangkan Pomodoro tetap di web.
+  dan bantuan reduction tetap tersedia. Workspace desktop, Pomodoro, landing,
+  dan recap publik sudah dikeluarkan dari kode aktif.
 - Ringkasan UAT `active_days` menghitung hari unik membuka aplikasi; `quest_days`
   tetap terpisah. Ekspor lama perlu dibuat ulang (schema ringkasan versi 2).
 
 Data versi lokal sebelumnya tetap didukung. Quest yang sudah di-commit tidak
 diganti oleh pembaruan. Pengingat terjadwal, backend, dan UAT native lengkap
-iOS/Android masih tahap berikutnya. UI web tidak direvisi dalam iterasi ini.
+iOS/Android masih tahap berikutnya. Google Auth, Supabase, MFA admin, dan whitelist
+Gmail sengaja ditunda ke tahap integrasi terakhir. Moderasi saat ini hanya demo
+lokal; belum menerima post dari perangkat lain.
 
 ## Menjalankan
 
@@ -58,7 +78,7 @@ Tekan ikon bulan/matahari untuk mengganti light/dark mode. Pilihan **Sistem**,
 tersimpan lokal. Tema berlaku pada mobile, preview iPhone, dan web.
 
 ```bash
-# Web preview
+# Pratinjau web admin
 bash scripts/preview.sh
 
 # iOS/Android simulator atau device
@@ -69,6 +89,10 @@ Di Windows, preview UI mobile dapat dibuka pada alamat localhost yang tetap:
 
 ```powershell
 .\scripts\preview-mobile.cmd
+# Web admin: http://localhost:8081
+.\scripts\preview-admin.cmd
+# Tampilan yang dipakai iPhone di Render (tanpa bingkai): http://localhost:8082
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-web.ps1 -Target mobile -Port 8082
 ```
 
 Setelah pesan `lib\main.dart is being served` muncul, buka
@@ -90,10 +114,11 @@ Salin dari `config/env/development.example.json` setelah clone.
   YouWELL dari ikonnya (layar penuh).
 
 Deploy web memakai [`render.yaml`](render.yaml) (static site gratis). Build-nya
-menjalankan `scripts/render-build.sh`, yang memasang Flutter lalu membangun
-tampilan HP (`--dart-define=MOBILE_WEB=true`). Isi `SUPABASE_URL` dan
-`SUPABASE_PUBLISHABLE_KEY` di dashboard Render; keduanya memang publik.
-**Jangan pernah** memasukkan service role key.
+menyiapkan dua static site: `youwell` menjalankan `scripts/render-build.sh mobile`,
+dan `youwell-admin` menjalankan `scripts/render-build.sh admin`. Keduanya memakai
+Flutter 3.47.7. Blueprint ini belum dipublikasikan dari sesi pengembangan.
+Konfigurasi Supabase dan login Google belum digunakan; akan ditambahkan pada
+tahap integrasi terakhir, termasuk whitelist Gmail yang diperiksa di server.
 
 Perbedaan versi web iPhone:
 
@@ -101,13 +126,20 @@ Perbedaan versi web iPhone:
   dari **lama sesi**, bukan jarak. Anak tangganya sama (Jalan 400 m ↔ Jalan
   5 menit), sehingga `ladder_gerak` tetap sebanding dengan Android.
 - Foto Meal Snap dipakai sebagai bukti saat check-in lalu dibuang.
-- Data lokal terhapus jika ikon dihapus, jadi sinkronisasi Supabase wajib.
+- Data masih lokal pada browser/perangkat. Jangan mengandalkan versi ini untuk
+  sinkronisasi antarperangkat sebelum integrasi Supabase selesai.
+
+Web admin memakai storage key `.admin-preview`, sehingga tidak membaca profil
+atau progres pribadi peserta. Pratinjau berbingkai memakai `.mobile-preview`.
+Data Android/web iPhone tetap memakai key lokal lama agar progres tidak terhapus.
+Pada admin development, tombol **Tambah contoh post** menyiapkan post berlabel
+contoh untuk menguji setujui/tolak. Ini tidak membuat post komunitas sungguhan.
 
 ## File utama
 
 Jika **Jalur kurangi rokok / vape** aktif di **Profil & Settings > Preferensi**,
-kartu **Kurangi rokok / vape** muncul di bawah companion pada **Hari ini**
-(atau **Home** di web). Tekan **Buka bantuan rokok / vape** untuk timer jeda 5 menit dan ide
+kartu **Kurangi rokok / vape** muncul di bawah companion pada **Hari ini**.
+Tekan **Buka bantuan rokok / vape** untuk timer jeda 5 menit dan ide
 aktivitas pengganti. Tombol yang sama juga tersedia langsung di Preferensi.
 Sesi jeda yang selesai tercatat di **Perjalanan > Jeda rokok / vape**.
 Mengganti preferensi tidak mengubah quest yang sudah dipilih hari ini;
@@ -128,8 +160,8 @@ quest pada kartu harian berikutnya mengikuti jalur yang aktif.
 | Antrean Admin | `lib/features/community/presentation/admin_moderation_page.dart` |
 | Onboarding | `lib/features/onboarding/presentation/onboarding_page.dart` |
 | Profile & settings | `lib/features/profile/presentation/profile_page.dart` |
-| Workspace web | `lib/features/web/presentation/web_workspace_page.dart` |
-| Focus Station web | `lib/features/web/presentation/pomodoro_page.dart` |
+| Web khusus admin | `lib/features/community/presentation/admin_shell.dart` |
+| Pemilihan target & storage | `lib/core/config/app_mode.dart` |
 | Semua perubahan data | `lib/application/wellness_controller.dart` |
 | Skema data lokal | `lib/data/models/wellness_snapshot.dart` |
 
@@ -139,13 +171,23 @@ quest pada kartu harian berikutnya mengikuti jalur yang aktif.
 flutter analyze
 flutter test
 flutter build web --release --no-web-resources-cdn \
-  --dart-define-from-file=config/env/development.example.json
+  --output=build/admin-web --dart-define-from-file=config/env/production.example.json
 # Tampilan HP untuk iPhone (sama seperti build Render)
 flutter build web --release --no-web-resources-cdn --dart-define=MOBILE_WEB=true \
-  --dart-define-from-file=config/env/development.example.json
+  --output=build/mobile-web --dart-define-from-file=config/env/production.example.json
 flutter build ios --simulator --no-codesign \
   --dart-define-from-file=config/env/development.example.json
 ```
+
+Di Windows dengan SDK lokal:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1 -BuildWeb
+```
+
+Script juga menangani path SDK yang mengandung spasi untuk menjalankan native
+test hooks. APK memerlukan Android SDK; build iOS
+native tetap memerlukan Mac dan Xcode dan bukan distribusi iPhone yang dipakai saat ini.
 
 Detail arsitektur ada di [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)
 dan panduan mobile di [docs/MOBILE_DEVELOPMENT.md](docs/MOBILE_DEVELOPMENT.md).
