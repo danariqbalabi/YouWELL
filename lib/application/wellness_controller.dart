@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:youwell/core/config/app_mode.dart' as app_mode;
+import 'package:youwell/core/config/app_environment.dart';
 import 'package:youwell/features/activity/domain/activity_evidence.dart';
 import 'package:youwell/core/types/json_map.dart';
 import 'package:youwell/core/utils/date_key.dart';
@@ -10,6 +11,7 @@ import 'package:youwell/data/models/wellness_snapshot.dart';
 import 'package:youwell/features/home/domain/daily_card_generator.dart';
 import 'package:youwell/features/home/domain/progress_calculator.dart';
 import 'package:youwell/features/home/domain/quest_ladder.dart';
+import 'package:youwell/features/home/domain/wellness_uat_program.dart';
 import 'package:youwell/features/progress/domain/level_curve.dart';
 import 'package:youwell/features/progress/domain/research_summary.dart';
 import 'package:youwell/features/companion/domain/companion_rewards.dart';
@@ -28,6 +30,10 @@ class WellnessController extends ChangeNotifier {
     if (saved != null) {
       try {
         _data = restoreWellnessState(saved);
+        if (wellnessUat &&
+            DateTime.tryParse(profile?['started']?.toString() ?? '') == null) {
+          _data['profile']['started'] = today;
+        }
         // Snapshots from the flat 100-XP curve keep the level they showed.
         if (_data['profile'] != null && _data['levelFloor'] == null) {
           _data['levelFloor'] = legacyLevelForXp(xp);
@@ -52,6 +58,13 @@ class WellnessController extends ChangeNotifier {
   bool _mobileRewardsEnabled = false;
   final List<RewardMoment> _moments = [];
   int rewardSerial = 0;
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   String get themePreference => _data['themeMode']?.toString() ?? 'system';
 
@@ -70,6 +83,19 @@ class WellnessController extends ChangeNotifier {
       ? null
       : Map<String, dynamic>.from(_data['profile']);
   bool get reduction => profile?['path'] == 'reduction';
+  bool get wellnessUat => profile?['path'] == 'wellness';
+  WellnessUatProgram? get wellnessProgram => wellnessUat
+      ? WellnessUatProgram(
+          started: profile?['started']?.toString() ?? today,
+          now: now,
+        )
+      : null;
+  bool get wellnessProgramComplete => wellnessProgram?.complete == true;
+  int ladderMaximum(String category) => ladderMax(
+    category,
+    lowImpact: profile?['lowImpact'] == true,
+    wellnessUat: wellnessUat,
+  );
 
   /// Under 21 the reduction path speaks about quitting (PP 28/2024 Ps. 434).
   /// The 18–22 bucket crosses 21, so it is treated as quit framing too;
@@ -121,8 +147,24 @@ class WellnessController extends ChangeNotifier {
     );
   }
 
+  JsonMap? get recommendedDailyCard => dailyDrawCards
+      .where(
+        (card) =>
+            card['recommended'] == true &&
+            !passedDailyCardIds.contains(card['id']),
+      )
+      .firstOrNull;
+
+  bool chooseRecommendedDailyCard() {
+    if (!wellnessUat || wellnessProgramComplete) return false;
+    prepareToday();
+    final card = recommendedDailyCard;
+    return card != null && selectDailyCard(card['id'].toString());
+  }
+
   bool get hasCommittedDailyCard => dailyCardDraw?['committedCardId'] != null;
-  bool get needsDailyCardDraw => profile != null && !hasCommittedDailyCard;
+  bool get needsDailyCardDraw =>
+      profile != null && !wellnessProgramComplete && !hasCommittedDailyCard;
   int get dailyCardSwitchesRemaining =>
       (1 - passedDailyCardIds.length).clamp(0, 1);
   bool get canChooseAnotherDailyCard =>
@@ -145,7 +187,9 @@ class WellnessController extends ChangeNotifier {
 
   /// One optional Kartu Bonus per day, offered after a full day.
   bool get canDrawBonusCard =>
-      coreComplete && days[today]?['bonusDrawn'] != true;
+      !wellnessProgramComplete &&
+      coreComplete &&
+      days[today]?['bonusDrawn'] != true;
 
   bool drawBonusCard() {
     if (!canDrawBonusCard) return false;
@@ -156,6 +200,8 @@ class WellnessController extends ChangeNotifier {
       cameraAvailable: !cameraUnavailable,
       hasWaterLadder: quests.any((task) => task['activityKind'] == 'water'),
       hasFoodLadder: quests.any((task) => task['ladder'] == 'Food'),
+      hour: now.hour,
+      wellnessUat: wellnessUat,
     );
     _data['days'][today]['quests'] = [
       ...quests,
@@ -239,10 +285,12 @@ class WellnessController extends ChangeNotifier {
     for (final entry in capacity.entries)
       entry.key: (entry.value['step'] as num?)?.toInt() ?? 1,
   };
-  List<String> get ladderOffers => [
-    for (final category in ladderCategories(reduction: reduction))
-      if (capacity[category]?['offerStep'] != null) category,
-  ];
+  List<String> get ladderOffers => wellnessProgramComplete
+      ? []
+      : [
+          for (final category in ladderCategories(reduction: reduction))
+            if (capacity[category]?['offerStep'] != null) category,
+        ];
 
   ResearchSummary researchSummary(int week) => ResearchSummary.forWeek(
     week: week,
@@ -259,13 +307,18 @@ class WellnessController extends ChangeNotifier {
     if (days[today] is Map && capacity.isNotEmpty) {
       _data['days'][today]['ladderSteps'] = ladderSteps;
     }
-    notifyListeners();
+    if (!_disposed) notifyListeners();
     final value = jsonEncode(_data);
     _pending = _pending.then((_) async {
       try {
         await persist?.call(value);
+        if (storageError != null) {
+          storageError = null;
+          if (!_disposed) notifyListeners();
+        }
       } catch (_) {
         storageError = 'Perubahan lokal belum tersimpan.';
+        if (!_disposed) notifyListeners();
       }
     });
     return _pending;
@@ -292,12 +345,17 @@ class WellnessController extends ChangeNotifier {
     final opened = (_data['openedDays'] ??= <dynamic>[]) as List;
     final firstOpenToday = !opened.contains(today);
     if (firstOpenToday) opened.add(today);
+    if (wellnessProgramComplete) {
+      if (firstOpenToday) _save();
+      return;
+    }
     final existing = days[today];
     if (existing != null &&
         (existing['cardPacks'] != null ||
             hasCommittedDailyCard ||
             completedCards.isNotEmpty)) {
-      if (firstOpenToday || _mobileRewardsEnabled) _save();
+      final refreshed = _refreshMealDraft();
+      if (firstOpenToday || _mobileRewardsEnabled || refreshed) _save();
       return;
     }
     _reviewLadders();
@@ -341,11 +399,13 @@ class WellnessController extends ChangeNotifier {
     cameraAvailable: !cameraUnavailable,
     hour: now.hour,
     timedWorkouts: timedWorkouts,
+    wellnessUat: wellnessUat,
     recentAttempts: {
       for (final category in ladderCategories(reduction: reduction))
         category: _ladderQuestsBefore(
           category,
           7,
+          includePractice: wellnessUat,
         ).map((task) => task['day']).toSet().length,
     },
     lowImpact: profile?['lowImpact'] == true,
@@ -354,18 +414,96 @@ class WellnessController extends ChangeNotifier {
 
   /// Rebuilds today's untouched cards after a ladder or path change.
   void _refreshDraft() {
-    if (days[today] == null || hasCommittedDailyCard) return;
+    if (days[today] == null ||
+        hasCommittedDailyCard ||
+        wellnessProgramComplete) {
+      return;
+    }
     _data['days'][today]['cardPacks'] = _cardPacks();
   }
 
+  bool _refreshMealDraft() {
+    if (!wellnessUat || hasCommittedDailyCard || wellnessProgramComplete) {
+      return false;
+    }
+    final cards = dailyDrawCards;
+    final expired = cards.any(
+      (card) => ((card['tasks'] ?? []) as List).whereType<Map>().any(
+        (task) =>
+            task['ladder'] == 'Food' &&
+            (task['photoWindows'] as List?)?.any(
+                  (window) => (window[1] as num) <= now.hour,
+                ) ==
+                true,
+      ),
+    );
+    if (!expired) return false;
+    _data['days'][today]['cardPacks'] = const DailyCardGenerator()
+        .refreshExpiredMeals(cards, today: today, hour: now.hour);
+    return true;
+  }
+
+  /// Existing evidence belongs to this calendar day, even if the card was
+  /// chosen later. Reward the newly completed tasks once, in one batch.
+  void _applyRecordedWellnessEvidence() {
+    final before = quests;
+    var finished = false;
+    final updated = [
+      for (final task in before) {...task},
+    ];
+    for (final task in updated) {
+      if (task['status'] == 'completed') continue;
+      double ratio = 0;
+      switch (task['activityKind']) {
+        case 'water':
+          final target = ((task['waterMl'] as num?)?.toDouble() ?? 250).clamp(
+            1,
+            4000,
+          );
+          ratio = water / target;
+        case 'walk' || 'run':
+          ratio = ActivityEvidence.workoutProgress(
+            task,
+            workoutSessions,
+            today,
+          );
+        case 'meal_snap':
+          final target = ((task['photoCount'] as num?)?.toInt() ?? 1).clamp(
+            1,
+            10,
+          );
+          ratio =
+              ActivityEvidence.mealPhotosMatched(task, mealCheckIns, today) /
+              target;
+      }
+      if (ratio >= 1) {
+        task['status'] = 'completed';
+        task['done'] = true;
+        task['validationInvalidated'] = false;
+        task.remove('partial');
+        finished = true;
+      } else if (ratio > 0) {
+        task['partial'] = (ratio * 100).floor() / 100;
+      }
+    }
+    _data['days'][today]['quests'] = updated;
+    if (finished) _markActivity();
+    _rewardCompletions(before);
+  }
+
   void _reviewLadders() {
+    if (wellnessProgramComplete) return;
     _reconcileActivityEvidence();
     final ladderState = (_data['capacity'] ??= <String, dynamic>{}) as Map;
     final pace = (profile?['pace'] as num?)?.toInt() ?? 1;
     final lowImpact = profile?['lowImpact'] == true;
     final inactive = _inactiveDays;
     for (final category in ladderCategories(reduction: reduction)) {
-      final maxStep = ladderMax(category, lowImpact: lowImpact);
+      final maxStep = ladderMax(
+        category,
+        lowImpact: lowImpact,
+        wellnessUat: wellnessUat,
+      );
       final entry = ladderState[category];
       if (entry is! Map) {
         final step = pace.clamp(1, maxStep);
@@ -377,6 +515,13 @@ class WellnessController extends ChangeNotifier {
         };
         continue;
       }
+      if (wellnessUat && ((entry['step'] as num?)?.toInt() ?? 1) > maxStep) {
+        entry['step'] = maxStep;
+        entry.remove('offerStep');
+        entry['reviewedOn'] = today;
+        entry['reason'] =
+            'Latihan disesuaikan dengan batas perjalanan 28 hari.';
+      }
       final since = _daysBetween(entry['reviewedOn'].toString(), today);
       if (since < 7 && !(inactive >= 5 && since >= 5)) continue;
       final current = ((entry['step'] as num?)?.toInt() ?? 1).clamp(1, maxStep);
@@ -384,17 +529,24 @@ class WellnessController extends ChangeNotifier {
         category: category,
         current: current,
         maxStep: maxStep,
-        weekQuests: _ladderQuestsBefore(category, 7),
+        weekQuests: _ladderQuestsBefore(
+          category,
+          7,
+          step: wellnessUat ? current : null,
+        ),
         inactiveDays: inactive,
       );
       final offered = review.change == 'up';
       ladderState[category] = {
+        if (wellnessUat) ...entry,
         'step': offered ? current : review.step,
-        if (offered) 'offerStep': review.step,
         'reviewedOn': today,
         'change': review.change,
         'reason': review.reason,
       };
+      // A new review always replaces the previous offer.
+      ladderState[category].remove('offerStep');
+      if (offered) ladderState[category]['offerStep'] = review.step;
     }
   }
 
@@ -403,6 +555,8 @@ class WellnessController extends ChangeNotifier {
     String category,
     int period, {
     String? before,
+    int? step,
+    bool includePractice = false,
   }) {
     final end = before ?? today;
     final start = dayKey(DateTime.parse(end).subtract(Duration(days: period)));
@@ -413,7 +567,8 @@ class WellnessController extends ChangeNotifier {
               in ((entry.value as Map)['quests'] ?? const []) as List)
             if (task is Map &&
                 task['ladder'] == category &&
-                task['practiceOnly'] != true &&
+                (step == null || task['step'] == step) &&
+                (includePractice || task['practiceOnly'] != true) &&
                 task['validationInvalidated'] != true)
               {...Map<String, dynamic>.from(task), 'day': entry.key},
     ];
@@ -431,6 +586,8 @@ class WellnessController extends ChangeNotifier {
       DateTime.parse(to).difference(DateTime.parse(from)).inDays;
 
   void acceptLadderStep(String category) {
+    if (wellnessProgramComplete) return;
+    if (wellnessUat) _refreshPendingLadderOffers();
     final entry = capacity[category];
     final offer = (entry?['offerStep'] as num?)?.toInt();
     if (entry == null || offer == null) return;
@@ -439,6 +596,8 @@ class WellnessController extends ChangeNotifier {
       'step': offer,
       'change': 'up',
       'acceptedOn': today,
+      // Start a fresh evidence week at acceptance, including late acceptance.
+      if (wellnessUat) 'reviewedOn': today,
     };
     if (_mobileRewardsEnabled) {
       _moments.add(
@@ -468,6 +627,8 @@ class WellnessController extends ChangeNotifier {
   void drawDailyCards() => prepareToday();
 
   bool selectDailyCard(String id) {
+    if (wellnessProgramComplete) return false;
+    if (wellnessUat) prepareToday();
     if (hasCommittedDailyCard ||
         passedDailyCardIds.contains(id) ||
         !dailyDrawCards.any((card) => card['id'] == id)) {
@@ -478,6 +639,7 @@ class WellnessController extends ChangeNotifier {
   }
 
   bool chooseAnotherDailyCard() {
+    if (wellnessProgramComplete) return false;
     if (!canChooseAnotherDailyCard) return false;
     final passed = [...passedDailyCardIds, selectedDailyCardId!];
     final choices = dailyDrawCards
@@ -498,6 +660,17 @@ class WellnessController extends ChangeNotifier {
   }
 
   bool commitDailyCardPack() {
+    if (wellnessProgramComplete) return false;
+    final beforeRefresh = selectedDailyCard;
+    final mealRefreshed = _refreshMealDraft();
+    if (mealRefreshed &&
+        beforeRefresh != null &&
+        jsonEncode(beforeRefresh['tasks']) !=
+            jsonEncode(selectedDailyCard?['tasks'])) {
+      // A deadline passed after reveal: show the replacement before consent.
+      _save();
+      return false;
+    }
     final card = selectedDailyCard;
     if (card == null || hasCommittedDailyCard) return false;
     final packTasks = card['tasks'] is List
@@ -517,6 +690,7 @@ class WellnessController extends ChangeNotifier {
       ...?dailyCardDraw,
       'committedCardId': card['id'],
     };
+    if (wellnessUat) _applyRecordedWellnessEvidence();
     _save();
     return true;
   }
@@ -527,6 +701,7 @@ class WellnessController extends ChangeNotifier {
   }
 
   bool completeCard(String id) {
+    if (wellnessProgramComplete) return false;
     final tasks = quests;
     final before = quests;
     final index = tasks.indexWhere((task) => task['id'] == id);
@@ -540,6 +715,7 @@ class WellnessController extends ChangeNotifier {
   }
 
   void addWater() {
+    if (wellnessProgramComplete) return;
     prepareToday();
     _markActivity();
     _data['days'][today]['water'] = (water + 250).clamp(0, 4000);
@@ -558,6 +734,7 @@ class WellnessController extends ChangeNotifier {
     required int seconds,
     required int meters,
   }) {
+    if (wellnessProgramComplete) return const WorkoutResult();
     if (seconds < 1) return const WorkoutResult();
     final kmPerHour = meters / seconds * 3.6;
     final tooFast = kmPerHour > maxWalkRunKmPerHour;
@@ -615,6 +792,7 @@ class WellnessController extends ChangeNotifier {
     bool photoCaptured = false,
     String note = '',
   }) {
+    if (wellnessProgramComplete) return;
     final hasPhotoEvidence = photoPath != null || photoCaptured;
     if (!hasPhotoEvidence && note.trim().isEmpty) return;
     _add('mealCheckIns', {
@@ -742,6 +920,19 @@ class WellnessController extends ChangeNotifier {
         completeCard(task['id'].toString());
       }
     }
+  }
+
+  /// A local fixture for reviewing the moderator UI before the backend exists.
+  void addModerationPreviewPost() {
+    if (!AppEnvironment.showPreviewTools) return;
+    _add('communityPosts', {
+      'alias': 'contohpeserta',
+      'text':
+          'Hari ini aku menyelesaikan satu langkah kecil. Ini contoh post untuk pratinjau moderasi.',
+      'status': 'pending',
+      'moderationNote': '',
+      'sample': true,
+    });
   }
 
   void submitCommunityPost(String text) {
@@ -970,11 +1161,12 @@ class WellnessController extends ChangeNotifier {
       final review = reviewLadder(
         category: category,
         current: current,
-        maxStep: ladderMax(category, lowImpact: profile?['lowImpact'] == true),
+        maxStep: ladderMaximum(category),
         weekQuests: _ladderQuestsBefore(
           category,
           7,
           before: entry['reviewedOn']?.toString() ?? today,
+          step: wellnessUat ? current : null,
         ),
         inactiveDays: 0,
       );

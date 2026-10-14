@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
@@ -35,6 +36,20 @@ class _DailyCardDrawDialogState extends State<DailyCardDrawDialog> {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.controller,
     builder: (context, _) {
+      if (widget.controller.wellnessProgramComplete) {
+        return AlertDialog(
+          title: const Text('Perjalanan 28 hari selesai'),
+          content: const Text(
+            'Challenge harian sudah selesai. Kamu bisa melihat rekap dan riwayat perjalananmu.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Lihat rekap'),
+            ),
+          ],
+        );
+      }
       final compact = MediaQuery.sizeOf(context).width < 600;
       return Dialog(
         insetPadding: EdgeInsets.symmetric(
@@ -89,6 +104,7 @@ class _DrawStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 600;
     final selected = controller.selectedDailyCard;
+    final recommended = controller.recommendedDailyCard;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         compact ? 18 : 28,
@@ -145,6 +161,24 @@ class _DrawStage extends StatelessWidget {
               selected: {controller.dailyPace},
               onSelectionChanged: (values) =>
                   controller.setDailyPace(values.first),
+            ),
+          ],
+          if (controller.wellnessUat &&
+              selected == null &&
+              recommended != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: controller.chooseRecommendedDailyCard,
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: Text('Buka rekomendasi · ${recommended['size']} misi'),
+              ),
+            ),
+            Text(
+              'Sekitar ${recommended['activeMinutes'] ?? recommended['durationMinutes']} menit aktivitas. '
+              'Hidrasi dan istirahat dilakukan sepanjang hari.',
+              style: TextStyle(color: context.colors.muted, fontSize: 12),
             ),
           ],
           const SizedBox(height: 12),
@@ -210,6 +244,7 @@ class _SpinningDeckState extends State<_SpinningDeck> {
   late final int _startPage;
   late int _page;
   bool _spinning = true;
+  Timer? _spinTimer;
 
   @override
   void initState() {
@@ -217,11 +252,16 @@ class _SpinningDeckState extends State<_SpinningDeck> {
     _startPage = _basePage + widget.initialIndex;
     _page = _startPage;
     _pages = PageController(initialPage: _startPage, viewportFraction: .48);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _spin());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _spinTimer = Timer(
+        const Duration(milliseconds: 220),
+        () => unawaited(_spin()),
+      );
+    });
   }
 
   Future<void> _spin() async {
-    await Future<void>.delayed(const Duration(milliseconds: 220));
     if (!mounted || !_pages.hasClients) return;
     final availableIndices = [
       for (var index = 0; index < widget.cards.length; index++)
@@ -257,6 +297,7 @@ class _SpinningDeckState extends State<_SpinningDeck> {
 
   @override
   void dispose() {
+    _spinTimer?.cancel();
     _pages.dispose();
     super.dispose();
   }
@@ -300,6 +341,9 @@ class _SpinningDeckState extends State<_SpinningDeck> {
                         ),
                         compact: compact,
                         onTap: () => _choose(physicalIndex),
+                        recommended:
+                            widget.cards[index]['recommended'] == true &&
+                            widget.cards[index].containsKey('activeMinutes'),
                       );
                     },
                   ),
@@ -333,10 +377,12 @@ class _CardBack extends StatelessWidget {
     required this.passed,
     required this.compact,
     required this.onTap,
+    this.recommended = false,
   });
   final int index;
   final bool centered, passed, compact;
   final VoidCallback onTap;
+  final bool recommended;
 
   @override
   Widget build(BuildContext context) {
@@ -432,7 +478,11 @@ class _CardBack extends StatelessWidget {
                       child: Column(
                         children: [
                           Text(
-                            passed ? 'SUDAH DILEWATI' : 'KARTU MISI',
+                            passed
+                                ? 'SUDAH DILEWATI'
+                                : recommended
+                                ? 'COCOK BUATMU'
+                                : 'KARTU MISI',
                             style: TextStyle(
                               color: palette.ink,
                               fontSize: 12,
@@ -723,7 +773,7 @@ class _CardFront extends StatelessWidget {
                 const SizedBox(height: 8),
                 _Pill(
                   label:
-                      '${card['durationMinutes']} menit  •  total +${card['xp']} XP',
+                      '±${card['activeMinutes'] ?? card['durationMinutes']} menit${card.containsKey('activeMinutes') ? ' aktivitas' : ''}  •  total +${card['xp']} XP',
                   color: context.colors.accent,
                 ),
                 const SizedBox(height: 16),

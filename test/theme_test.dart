@@ -8,9 +8,7 @@ import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/core/theme/app_theme.dart';
 import 'package:youwell/core/theme/appearance_scope.dart';
 import 'package:youwell/data/models/wellness_snapshot.dart';
-import 'package:youwell/features/web/presentation/web_landing_page.dart';
-import 'package:youwell/features/web/presentation/web_workspace_page.dart';
-import 'package:youwell/features/web/presentation/public_recap_page.dart';
+import 'package:youwell/features/community/presentation/admin_shell.dart';
 
 double contrast(Color a, Color b) {
   final first = a.computeLuminance();
@@ -100,7 +98,7 @@ void main() {
   });
 
   for (final mode in ['light', 'dark']) {
-    testWidgets('Public pages and desktop workspace render in $mode mode', (
+    testWidgets('Moderator console renders in $mode mode without onboarding', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(1280, 1000);
@@ -108,39 +106,21 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final controller = WellnessController();
-      await controller.setup({
-        'alias': 'preview',
-        'path': 'wellness',
-        'pace': 1,
-        'companion': 'plant',
-      });
       await controller.setThemePreference(mode);
-      for (final page in [
-        WebLandingPage(onJoin: () async {}),
-        PublicRecapPage(controller: controller),
-        WebWorkspacePage(controller: controller),
-      ]) {
-        await tester.pumpWidget(
-          AppearanceScope(
-            controller: controller,
-            child: MaterialApp(
-              theme: mode == 'light' ? AppTheme.light : AppTheme.dark,
-              home: page,
-            ),
+      await tester.pumpWidget(
+        AppearanceScope(
+          controller: controller,
+          child: MaterialApp(
+            theme: mode == 'light' ? AppTheme.light : AppTheme.dark,
+            home: AdminShell(controller: controller),
           ),
-        );
-        await tester.pumpAndSettle();
-        expect(
-          tester.takeException(),
-          isNull,
-          reason: page.runtimeType.toString(),
-        );
-      }
-      for (final label in ['Focus Station', 'Progress', 'Community']) {
-        await tester.tap(find.widgetWithText(ListTile, label));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-      }
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Moderasi komunitas'), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+      expect(controller.profile, isNull);
+      expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
     testWidgets('Mobile navigation and profile work in $mode mode', (

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
+import 'package:youwell/core/config/app_environment.dart';
 
 class AdminModerationPage extends StatelessWidget {
   const AdminModerationPage({super.key, required this.controller});
@@ -14,19 +15,30 @@ class AdminModerationPage extends StatelessWidget {
       padding: const EdgeInsets.all(30),
       children: [
         const Text(
-          'Community Admin',
+          'Moderasi komunitas',
           style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 6),
         Text(
-          'Prototype lokal. Role dan audit log server ditambahkan bersama Auth.',
+          'Pratinjau lokal. Halaman ini belum menerima post dari perangkat peserta.',
           style: TextStyle(color: context.colors.muted),
         ),
         const SizedBox(height: 24),
+        if (AppEnvironment.showPreviewTools) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: controller.addModerationPreviewPost,
+              icon: const Icon(Icons.add),
+              label: const Text('Tambah contoh post'),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         _Summary(pending: queue.length, reports: reports.length),
         const SizedBox(height: 24),
         const Text(
-          'Pending posts',
+          'Menunggu persetujuan',
           style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 12),
@@ -37,7 +49,7 @@ class AdminModerationPage extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         const Text(
-          'Reports',
+          'Laporan',
           style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 12),
@@ -83,11 +95,11 @@ class _Summary extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     children: [
       Expanded(
-        child: _Number(value: '$pending', label: 'Pending'),
+        child: _Number(value: '$pending', label: 'Menunggu'),
       ),
       const SizedBox(width: 12),
       Expanded(
-        child: _Number(value: '$reports', label: 'Reports'),
+        child: _Number(value: '$reports', label: 'Laporan'),
       ),
     ],
   );
@@ -145,6 +157,10 @@ class _ModerationCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
+        if (post['sample'] == true) ...[
+          const Chip(label: Text('Contoh lokal')),
+          const SizedBox(height: 8),
+        ],
         Text(post['text'].toString(), style: const TextStyle(height: 1.5)),
         const SizedBox(height: 16),
         Wrap(
@@ -156,7 +172,7 @@ class _ModerationCard extends StatelessWidget {
                 'approved',
               ),
               icon: const Icon(Icons.check_rounded),
-              label: const Text('Approve'),
+              label: const Text('Setujui'),
             ),
             OutlinedButton.icon(
               onPressed: () => controller.moderateCommunityPost(
@@ -165,7 +181,7 @@ class _ModerationCard extends StatelessWidget {
                 note: 'Tidak sesuai panduan komunitas.',
               ),
               icon: const Icon(Icons.close_rounded),
-              label: const Text('Reject'),
+              label: const Text('Tolak'),
             ),
           ],
         ),

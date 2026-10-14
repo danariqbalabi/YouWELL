@@ -1,0 +1,2 @@
+# Windows development and Linux/Render execute the same shell scripts.
+*.sh text eol=lf

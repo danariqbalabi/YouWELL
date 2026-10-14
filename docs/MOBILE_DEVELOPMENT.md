@@ -11,15 +11,15 @@ capability iOS, archive, dan distribusi.
 - iPhone menggunakan orientasi portrait.
 - Penyimpanan masih local-first melalui `SharedPreferences`.
 - Gamifikasi mobile terpisah di `lib/features/companion/` dan
-  `lib/application/wellness_gamification.dart`. Web tidak memakai reward host
-  atau ilustrasi companion mobile yang baru.
+  `lib/application/wellness_gamification.dart`. Web iPhone memakai mobile reward
+  host yang sama; web admin hanya menampilkan moderasi.
 - Reward/lencana dan preferensi animasi/getaran tersimpan lokal. Kalender
   perjalanan 28 hari dan ritme 4/7 menggunakan quest yang selesai.
 - Tab mobile: **Hari ini**, **Aktivitas**, **Perjalanan**, **Komunitas**. Jeda cepat
   dibuka dari Hari ini; Profil melalui avatar di kanan atas.
 - Check-in energi dan Fokus 5m tidak ada di mobile. Jeda fisik 60s memandu
   postur, stretching, dan ubah posisi; hidrasi berada di Aktivitas.
-  Fokus/Pomodoro hanya di web.
+  Workspace desktop dan Fokus/Pomodoro sudah dihapus dari kode aktif.
 - Aktivitas memiliki Meal Snap (foto lokal di penyimpanan aplikasi) dan
   jalan/lari dengan timer serta perkiraan jarak GPS hanya saat layar sesi aktif.
   Aplikasi tidak menghitung kalori, tidak menyimpan koordinat/rute, dan belum
@@ -63,8 +63,10 @@ Preview membuka alur mobile yang sama (onboarding, Home, Aktivitas, Perjalanan,
 Komunitas, dan Profil) dalam frame portrait 393 × 852 dengan tema platform iOS.
 Data preview disimpan terpisah dari data web biasa. Ini preview UI di browser;
 fitur perangkat seperti permission iOS, kamera, dan GPS tetap perlu diuji pada
-iPhone atau simulator iOS di Mac. Tanpa flag `MOBILE_PREVIEW`, web tetap memakai
-landing page dan workspace desktop.
+iPhone atau simulator iOS di Mac. Tanpa flag mobile, web membuka admin moderasi.
+Build `MOBILE_WEB=true` adalah aplikasi untuk iPhone melalui Safari/Render,
+tanpa bingkai pratinjau. Distribusi native iOS berikut ini tetap opsional;
+distribusi peserta memakai APK Android dan web iPhone.
 
 ## Setup Mac satu kali
 

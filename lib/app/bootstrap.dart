@@ -12,9 +12,7 @@ Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
   final localRepository = LocalWellnessRepository(
     await SharedPreferences.getInstance(),
-    storageKey: mobilePreview
-        ? '${AppEnvironment.storageKey}.mobile-preview'
-        : AppEnvironment.storageKey,
+    storageKey: storageKeyForSurface(AppEnvironment.storageKey, appSurface),
   );
   final resetLocalData = kIsWeb && Uri.base.queryParameters['reset'] == '1';
   if (resetLocalData) await localRepository.clear();

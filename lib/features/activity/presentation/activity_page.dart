@@ -16,6 +16,27 @@ class ActivityPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    if (controller.wellnessProgramComplete) {
+      return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text('Aktivitas', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 12),
+          const Text(
+            'Perjalanan 28 hari selesai. Catatan sebelumnya tetap bisa dilihat; tidak ada challenge baru.',
+          ),
+          const SizedBox(height: 16),
+          _ActivityAction(
+            icon: Icons.history_rounded,
+            color: c.accent,
+            title: 'Riwayat aktivitas',
+            detail: 'Lihat langkah-langkah yang sudah kamu catat.',
+            onTap: () =>
+                _open(context, ActivityHistoryPage(controller: controller)),
+          ),
+        ],
+      );
+    }
     final todayWorkouts = controller.workoutSessions
         .where((row) => row['day'] == controller.today)
         .toList();

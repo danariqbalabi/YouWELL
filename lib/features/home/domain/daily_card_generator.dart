@@ -25,15 +25,16 @@ class DailyCardGenerator {
     int hour = 0,
     Map<String, int> recentAttempts = const {},
     bool timedWorkouts = false,
+    bool wellnessUat = false,
   }) {
     final combos = _combos(today, reduction, recentAttempts);
     final order = [...sizes]
       ..sort((a, b) => _score('$a', today).compareTo(_score('$b', today)));
+    if (wellnessUat) _shuffle(order, '$today:wellness-sizes');
     final cardSizes = relaxed ? List.filled(sizes.length, 3) : order;
     // Tempo only recommends a card; any card can still be taken.
     final recommendedSize = relaxed ? 3 : (pace + 2).clamp(3, 5);
-    final recommended = cardSizes.indexOf(recommendedSize);
-    return List.generate(sizes.length, (index) {
+    final cards = List.generate(sizes.length, (index) {
       final categories = combos[index % combos.length];
       final ladderTasks = [
         for (final category in categories)
@@ -41,7 +42,11 @@ class DailyCardGenerator {
             category,
             ((steps[category] ?? 1) - (relaxed ? 1 : 0)).clamp(
               1,
-              ladderMax(category, lowImpact: lowImpact),
+              ladderMax(
+                category,
+                lowImpact: lowImpact,
+                wellnessUat: wellnessUat,
+              ),
             ),
             today,
             index,
@@ -57,6 +62,8 @@ class DailyCardGenerator {
         reduction: reduction,
         cameraAvailable: cameraAvailable,
         salt: '$today:$index',
+        hour: hour,
+        wellnessUat: wellnessUat,
       );
       final tasks = [
         ...ladderTasks,
@@ -74,15 +81,104 @@ class DailyCardGenerator {
         'size': tasks.length,
         // 1 Ringan · 2 Sedang · 3 Penuh, from the number of missions.
         'difficulty': (tasks.length - 2).clamp(1, 3),
-        if (index == recommended) 'recommended': true,
         'tasks': tasks,
         'xp': tasks.fold<int>(0, (sum, task) => sum + (task['xp'] as int)),
         'durationMinutes': tasks.fold<int>(
           0,
           (sum, task) => sum + (task['durationMinutes'] as int),
         ),
+        if (wellnessUat) 'activeMinutes': _activeMinutes(tasks),
+        if (wellnessUat)
+          'categoryUsage': categories.fold<int>(
+            0,
+            (sum, category) => sum + (recentAttempts[category] ?? 0),
+          ),
       };
     });
+    // Tempo sets the recommended size. Balance practice before preferring
+    // lower active effort, so the easiest category mix cannot dominate.
+    final candidates = cards
+        .where((card) => card['size'] == recommendedSize)
+        .toList();
+    if (wellnessUat) {
+      candidates.sort((a, b) {
+        final byPractice = (a['categoryUsage'] as int).compareTo(
+          b['categoryUsage'] as int,
+        );
+        return byPractice != 0
+            ? byPractice
+            : (a['activeMinutes'] as int).compareTo(b['activeMinutes'] as int);
+      });
+    }
+    candidates.first['recommended'] = true;
+    return cards;
+  }
+
+  int _activeMinutes(List<JsonMap> tasks) => tasks.fold(
+    0,
+    (sum, task) =>
+        sum +
+        (task['ladder'] == 'Energy' || task['activityKind'] == 'water'
+            ? 0
+            : (task['durationMinutes'] as num?)?.toInt() ?? 0),
+  );
+
+  /// Fisher–Yates with integer arithmetic that is identical on Dart VM/web.
+  void _shuffle<T>(List<T> values, String salt) {
+    var state = _score('shuffle', salt) + 1;
+    for (var index = values.length - 1; index > 0; index--) {
+      state = (state * 48271) % 2147483647;
+      final other = state % (index + 1);
+      final value = values[index];
+      values[index] = values[other];
+      values[other] = value;
+    }
+  }
+
+  /// Refresh only expired meal tasks; preserve card IDs, sizes, categories,
+  /// recommended flags and already revealed choices. Never called on commits.
+  List<JsonMap> refreshExpiredMeals(
+    List<JsonMap> cards, {
+    required String today,
+    required int hour,
+  }) {
+    return [
+      for (final (index, card) in cards.indexed)
+        _refreshMealCard(card, today, hour, index),
+    ];
+  }
+
+  JsonMap _refreshMealCard(JsonMap card, String today, int hour, int index) {
+    final tasks = (card['tasks'] as List).cast<JsonMap>();
+    final refreshed = [
+      for (final task in tasks)
+        if (task['ladder'] == 'Food' &&
+            (task['photoWindows'] as List?)?.any(
+                  (window) => (window[1] as num) <= hour,
+                ) ==
+                true)
+          {
+            ..._ladderTask(
+              'Food',
+              (task['step'] as num).toInt(),
+              today,
+              index,
+              hour: hour,
+              cameraAvailable: true,
+              practice: task['practiceOnly'] == true,
+              timedWorkouts: false,
+            ),
+            'id': task['id'],
+          }
+        else
+          task,
+    ];
+    return {
+      ...card,
+      'tasks': refreshed,
+      if (card.containsKey('activeMinutes'))
+        'activeMinutes': _activeMinutes(refreshed),
+    };
   }
 
   /// Light extras after a full day (§6): no ladder or strenuous quests,
@@ -95,6 +191,8 @@ class DailyCardGenerator {
     required bool hasWaterLadder,
     bool hasFoodLadder = false,
     int count = 3,
+    int hour = 0,
+    bool wellnessUat = false,
   }) {
     final taken = takenCatalogIds.toSet();
     final pool =
@@ -102,6 +200,11 @@ class DailyCardGenerator {
           if (taken.contains(task.id)) return false;
           if (task.reductionOnly && !reduction) return false;
           if (task.difficulty > 1) return false;
+          if (wellnessUat &&
+              (task.durationMinutes > 5 ||
+                  (task.id == 'sunlight' && hour >= 12))) {
+            return false;
+          }
           if (task.activityKind == 'water' && hasWaterLadder) return false;
           if (_mealSideIds.contains(task.id) && hasFoodLadder) return false;
           if (task.activityKind == 'meal_snap' && !cameraAvailable) {
@@ -160,12 +263,19 @@ class DailyCardGenerator {
     required bool reduction,
     required bool cameraAvailable,
     required String salt,
+    int hour = 0,
+    bool wellnessUat = false,
   }) {
     if (count <= 0) return const [];
     final eligible =
         [..._catalog, ..._mobileCatalog].where((task) {
           if (task.reductionOnly && !reduction) return false;
           if (task.difficulty > count + 1) return false;
+          if (wellnessUat &&
+              (task.durationMinutes > 5 ||
+                  (task.id == 'sunlight' && hour >= 12))) {
+            return false;
+          }
           // One +250 ml tap or one photo must not finish two quests.
           if (task.activityKind == 'water' &&
               categories.contains('Lifestyle')) {

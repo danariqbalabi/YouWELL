@@ -5,6 +5,7 @@ import 'package:youwell/core/utils/date_key.dart';
 import 'package:youwell/features/companion/domain/companion_rewards.dart';
 import 'package:youwell/features/companion/presentation/mobile_companion.dart';
 import 'package:youwell/features/home/domain/quest_ladder.dart';
+import 'package:youwell/features/home/presentation/wellness_program_card.dart';
 import 'package:youwell/features/progress/presentation/journey_rewards.dart';
 import 'package:youwell/shared/widgets/game_widgets.dart';
 
@@ -35,6 +36,10 @@ class ProgressPage extends StatelessWidget {
           style: TextStyle(color: c.muted),
         ),
         const SizedBox(height: 16),
+        if (controller.wellnessUat) ...[
+          WellnessProgramCard(controller: controller),
+          const SizedBox(height: 14),
+        ],
         GameCard(
           child: Column(
             children: [
@@ -122,10 +127,7 @@ class ProgressPage extends StatelessWidget {
                 _LadderRow(
                   category: category,
                   entry: controller.capacity[category],
-                  maxStep: ladderMax(
-                    category,
-                    lowImpact: controller.profile?['lowImpact'] == true,
-                  ),
+                  maxStep: controller.ladderMaximum(category),
                 ),
             ],
           ),
