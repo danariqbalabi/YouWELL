@@ -16,7 +16,7 @@ class ActivityPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    if (controller.wellnessProgramComplete) {
+    if (controller.uatProgramComplete) {
       return ListView(
         padding: const EdgeInsets.all(20),
         children: [

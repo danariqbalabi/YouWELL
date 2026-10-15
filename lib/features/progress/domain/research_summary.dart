@@ -82,7 +82,9 @@ class ResearchSummary {
       delayCravingCompleted: habitDelays
           .where((row) => inWeek(row['day']) && row['completed'] != false)
           .length,
-      habitSwapCount: habitSwaps.where((row) => inWeek(row['day'])).length,
+      habitSwapCount: habitSwaps
+          .where((row) => inWeek(row['day']) && row['outcome'] != 'not_tried')
+          .length,
     );
   }
 

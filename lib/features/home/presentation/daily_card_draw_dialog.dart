@@ -36,7 +36,7 @@ class _DailyCardDrawDialogState extends State<DailyCardDrawDialog> {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.controller,
     builder: (context, _) {
-      if (widget.controller.wellnessProgramComplete) {
+      if (widget.controller.uatProgramComplete) {
         return AlertDialog(
           title: const Text('Perjalanan 28 hari selesai'),
           content: const Text(
@@ -163,7 +163,7 @@ class _DrawStage extends StatelessWidget {
                   controller.setDailyPace(values.first),
             ),
           ],
-          if (controller.wellnessUat &&
+          if (controller.uatProgram != null &&
               selected == null &&
               recommended != null) ...[
             const SizedBox(height: 8),

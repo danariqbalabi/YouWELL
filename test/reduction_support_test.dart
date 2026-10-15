@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youwell/app/youwell_app.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/features/home/presentation/home_page.dart';
+import 'package:youwell/features/reduction/presentation/habit_swap_panel.dart';
 
 void main() {
   for (final mode in ['light', 'dark']) {
@@ -45,7 +46,8 @@ void main() {
         await tester.tap(preference);
         await tester.pumpAndSettle();
         expect(controller.reduction, isTrue);
-        expect(find.text('Buka Delay Craving & Habit Swap'), findsOneWidget);
+        controller.setNicotineProduct('cigarette');
+        expect(find.text('Buka Habit Swap'), findsOneWidget);
         expect(
           WellnessController(saved: controller.export()).reduction,
           isTrue,
@@ -64,31 +66,66 @@ void main() {
           ),
           findsOneWidget,
         );
-        await tester.ensureVisible(
-          find.text('Buka Delay Craving & Habit Swap'),
+        await tester.ensureVisible(find.text('Buka Habit Swap'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Buka Habit Swap'));
+        await tester.pumpAndSettle();
+        expect(find.text('Rokok / vape'), findsOneWidget);
+        expect(find.text('Mulai'), findsNothing);
+        expect(find.text('02:00'), findsNothing);
+        await tester.tap(find.text('Setelah makan'));
+        await tester.scrollUntilVisible(
+          find.text('Jalan santai sebentar'),
+          150,
+          scrollable: find
+              .descendant(
+                of: find.byType(HabitSwapPanel),
+                matching: find.byType(Scrollable),
+              )
+              .first,
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Buka Delay Craving & Habit Swap'));
+        await tester.tap(find.text('Jalan santai sebentar'));
+        await tester.scrollUntilVisible(
+          find.text('Sudah mencoba, tetap merokok'),
+          150,
+          scrollable: find
+              .descendant(
+                of: find.byType(HabitSwapPanel),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
-        expect(find.text('Delay Craving & Habit Swap'), findsOneWidget);
-        // Pace 1 starts the Reduction ladder at Delay Craving 2 minutes.
-        expect(find.text('02:00'), findsOneWidget);
-        await tester.tap(find.text('Mulai'));
-        await tester.pump(const Duration(minutes: 2));
+        await tester.tap(find.text('Sudah mencoba, tetap merokok'));
+        await tester.scrollUntilVisible(
+          find.text('Simpan catatan momen'),
+          150,
+          scrollable: find
+              .descendant(
+                of: find.byType(HabitSwapPanel),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
-        expect(controller.delayedToday, 1);
-        expect(find.text('Jeda selesai dan sudah dicatat.'), findsOneWidget);
+        await tester.tap(find.text('Simpan catatan momen'));
+        await tester.pumpAndSettle();
+        expect(controller.habitSwapsToday, 1);
+        expect(
+          find.text(
+            'Catatan tersimpan. Terima kasih sudah mencatat dengan jujur.',
+          ),
+          findsOneWidget,
+        );
 
         await tester.pageBack();
         await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
-          find.text('1 Delay Craving & 0 Habit Swap hari ini'),
+          find.text('aktivitas dicoba hari ini'),
           150,
         );
-        expect(
-          find.text('1 Delay Craving & 0 Habit Swap hari ini'),
-          findsOneWidget,
-        );
+        expect(find.text('aktivitas dicoba hari ini'), findsOneWidget);
         controller.switchPath(false);
         await tester.pumpAndSettle();
         expect(
@@ -98,7 +135,8 @@ void main() {
           ),
           findsNothing,
         );
-        expect(controller.habitDelays, hasLength(1));
+        expect(controller.habitDelays, isEmpty);
+        expect(controller.habitSwaps, hasLength(1));
         expect(controller.quests, plan);
         expect(tester.takeException(), isNull);
       },

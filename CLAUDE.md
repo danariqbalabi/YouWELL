@@ -6,6 +6,31 @@ Dokumen ini merangkum keputusan desain YouWell yang sudah dikunci di proposal pe
 
 ---
 
+## Keputusan terbaru: 15 Oktober 2026
+
+Pengembang meminta penghapusan Delay Craving/timer jeda. Keputusan ini
+menggantikan ketentuan timer di bagian proposal lama di bawah dan di dokumen
+spesifikasi. Path rokok/vape sekarang menyediakan Habit Swap tanpa countdown,
+satu misi aktivitas pengganti + dua kategori wellness pada setiap kartu.
+Tidak ada kenaikan durasi menunggu atau lencana menit ditunda. Misi timer
+yang masih terbuka/draft diganti menjadi Habit Swap; riwayat selesai dan XP
+dipertahankan. Nama kolom ekspor timer lama dipertahankan untuk membaca arsip,
+tanpa pencatatan timer baru. Kedua path sekarang dibatasi 28 hari kalender,
+dengan batas wellness ringan yang sama. Reduction menyediakan pemicu →
+aktivitas → hasil (melewatkan / mencoba tetapi tetap menggunakan / belum
+mencoba), jurnal total harian per jenis, rencana pengganti, dan target mingguan
+opsional pilihan pengguna setelah minggu pertama cukup tercatat. Gerak ringan
+diutamakan saat seri, tanpa menambah intensitas wajib. Catatan momen memiliki
+ID pengiriman untuk menolak duplikat, tanpa cooldown sepuluh menit.
+Hanya aktivitas yang dicoba menyelesaikan misi Habit Swap; dua hasil mencoba
+mendapat XP yang sama, sekali per misi/hari. Total konsumsi tidak memberi XP.
+Batang rokok dan sesi vape tidak dikonversi atau digabung menjadi dosis nikotin.
+Hari kosong bukan nol. Data mentah hanya lokal dan tidak masuk ekspor riset.
+Skenario UAT khusus path ini memakai Habit Swap dan jurnal konsumsi.
+Lihat `docs/REDUCTION_UAT.md` untuk aturan serta sumber pendukung.
+
+---
+
 ## 1. Ringkasan produk
 
 YouWell adalah prototipe fungsional (MVP) aplikasi seluler Flutter. Fungsinya: pendamping gaya hidup sehat untuk remaja dan dewasa muda usia 15 - 22 tahun, dengan pendekatan *wellness-first*, rendah stigma, dan tidak terasa klinis.

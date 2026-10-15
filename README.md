@@ -139,9 +139,13 @@ contoh untuk menguji setujui/tolak. Ini tidak membuat post komunitas sungguhan.
 
 Jika **Jalur kurangi rokok / vape** aktif di **Profil & Settings > Preferensi**,
 kartu **Kurangi rokok / vape** muncul di bawah companion pada **Hari ini**.
-Tekan **Buka bantuan rokok / vape** untuk timer jeda 5 menit dan ide
-aktivitas pengganti. Tombol yang sama juga tersedia langsung di Preferensi.
-Sesi jeda yang selesai tercatat di **Perjalanan > Jeda rokok / vape**.
+Tekan **Buka Habit Swap** untuk mencatat pemicu, aktivitas, dan hasil momen.
+Halaman yang sama menyediakan tab **Catatan harian** (total batang rokok/sesi
+vape terpisah) dan **Progres** (rata-rata empat minggu dan target opsional).
+Jalan ringan atau gerak sambil duduk diprioritaskan; tidak ada timer jeda.
+Kartu reduction berisi Habit Swap + dua kategori wellness. Kedua path berjalan
+28 hari kalender lalu rekap. XP menghargai percobaan, tanpa mensyaratkan hasil
+melewatkan rokok/vape. Detail: [Reduction UAT](docs/REDUCTION_UAT.md).
 Mengganti preferensi tidak mengubah quest yang sudah dipilih hari ini;
 quest pada kartu harian berikutnya mengikuti jalur yang aktif.
 
@@ -154,7 +158,7 @@ quest pada kartu harian berikutnya mengikuti jalur yang aktif.
 | Aturan reward mobile | `lib/application/wellness_gamification.dart` |
 | Daily Card popup | `lib/features/home/presentation/daily_card_draw_dialog.dart` |
 | Aturan quest adaptif | `lib/features/home/domain/daily_card_generator.dart` |
-| Delay Craving & Habit Swap | `lib/features/reduction/presentation/delay_craving_panel.dart` |
+| Habit Swap | `lib/features/reduction/presentation/habit_swap_panel.dart` |
 | Progress | `lib/features/progress/presentation/progress_page.dart` |
 | Community Wall lokal | `lib/features/community/presentation/community_page.dart` |
 | Antrean Admin | `lib/features/community/presentation/admin_moderation_page.dart` |

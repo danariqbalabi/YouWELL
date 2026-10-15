@@ -63,10 +63,6 @@ const achievementNames = {
   'first-quest': 'Langkah pertama',
   'full-day': 'Hari penuh pertama',
   'weekly-rhythm': 'Ritme 4 hari',
-  'first-delay': 'Jeda pertama',
-  'delay-30': '30 menit ditunda',
-  'delay-60': '1 jam ditunda',
-  'delay-300': '5 jam ditunda',
   'hydration-7': '7 hari hidrasi',
   'first-ladder': 'Anak tangga baru',
 };

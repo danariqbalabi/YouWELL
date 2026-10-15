@@ -491,16 +491,21 @@ void main() {
   );
 
   test(
-    'Reduction progression and its card selection are left for the next phase',
+    'Reduction now shares the 28-day boundary and gentle UAT limits',
     () async {
       final sim = Sim();
       await sim.start(path: 'reduction', pace: 3);
       expect(sim.controller.wellnessProgram, isNull);
-      expect(sim.controller.ladderMaximum('Body'), 10);
-      expect(sim.cards.map((c) => c['size']).toList(), [3, 3, 4, 4, 5]);
+      expect(sim.controller.ladderMaximum('Body'), 4);
+      expect(
+        sim.cards.every((c) => sim.categoriesOf(c).contains('Reduction')),
+        isTrue,
+      );
+      expect(sim.controller.uatProgram, isNotNull);
       sim.now = sim.now.add(const Duration(days: 28));
       sim.controller.prepareToday();
-      expect(sim.controller.needsDailyCardDraw, isTrue);
+      expect(sim.controller.needsDailyCardDraw, isFalse);
+      expect(sim.controller.uatProgramComplete, isTrue);
       expect(
         sim.cards.every((c) => sim.categoriesOf(c).contains('Reduction')),
         isTrue,

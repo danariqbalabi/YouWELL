@@ -9,7 +9,7 @@ class WellnessProgramCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final program = controller.wellnessProgram;
+    final program = controller.uatProgram;
     if (program == null) return const SizedBox.shrink();
     final c = context.colors;
     final summaries = [
@@ -51,11 +51,23 @@ class WellnessProgramCard extends StatelessWidget {
               ),
           ] else ...[
             Text(
-              program.phase,
+              controller.reduction
+                  ? switch (program.week) {
+                      1 => 'Kenali pola dan pemicu',
+                      2 => 'Ubah satu momen rutin',
+                      3 => 'Ulangi yang membantu',
+                      _ => 'Jaga ritme yang cocok',
+                    }
+                  : program.phase,
               style: TextStyle(color: c.accent, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 4),
-            Text(program.message),
+            Text(
+              controller.reduction
+                  ? 'Catat dengan jujur. Coba gerak ringan atau aktivitas pengganti yang cocok. '
+                        'Kamu boleh mempertahankan target.'
+                  : program.message,
+            ),
             const SizedBox(height: 8),
             Text(
               'Arah ritme: satu misi pada 4 dari 7 hari. Hari yang terlewat tidak menghapus progres.',

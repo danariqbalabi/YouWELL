@@ -33,7 +33,7 @@ class ProfilePage extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Ringkasan berisi jumlah hari dibuka, aktivitas, quest, tingkat tangga, Delay Craving, dan Habit Swap. Tidak menyertakan alias, teks pribadi, foto, atau lokasi. Belum dikirim otomatis; ekspor dan bagikan hanya jika kamu setuju.',
+                  'Ringkasan berisi jumlah hari dibuka, aktivitas, quest, tingkat tangga, dan Habit Swap. Tidak menyertakan alias, teks pribadi, foto, atau lokasi. Belum dikirim otomatis; ekspor dan bagikan hanya jika kamu setuju.',
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
@@ -267,8 +267,8 @@ class ProfilePage extends StatelessWidget {
                 ),
                 if (controller.reduction)
                   _Row(
-                    icon: Icons.timer_outlined,
-                    label: 'Buka Delay Craving & Habit Swap',
+                    icon: Icons.swap_horiz_rounded,
+                    label: 'Buka Habit Swap',
                     onTap: () => openReductionSupport(context, controller),
                   ),
                 SwitchListTile(
@@ -444,8 +444,8 @@ class ProfilePage extends StatelessWidget {
                   ),
                   subtitle: Text(
                     controller.reduction
-                        ? 'Aktif. Delay Craving & Habit Swap ada di bawah companion di Hari ini.'
-                        : 'Tampilkan Delay Craving & Habit Swap di Hari ini dan tambahkan quest-nya ke kartu harian.',
+                        ? 'Aktif. Habit Swap tersedia di Hari ini.'
+                        : 'Tampilkan Habit Swap di Hari ini dan tambahkan misinya ke kartu harian.',
                   ),
                   value: controller.reduction,
                   onChanged: (value) => _switchPath(context, value),
@@ -454,7 +454,7 @@ class ProfilePage extends StatelessWidget {
                   FilledButton.icon(
                     onPressed: () => openReductionSupport(context, controller),
                     icon: const Icon(Icons.smoke_free_rounded),
-                    label: const Text('Buka Delay Craving & Habit Swap'),
+                    label: const Text('Buka Habit Swap'),
                   ),
                   const SizedBox(height: 10),
                 ],

@@ -71,6 +71,14 @@ class Sim {
         for (var i = 0; i < ((task['photoCount'] as int?) ?? 1); i++) {
           controller.recordMeal(photoPath: '/tmp/meal-$i.jpg');
         }
+      case 'habit_swap':
+        controller.recordHabitSwap(
+          eventId: 'moment-${controller.habitSwaps.length}',
+          product: 'cigarette',
+          trigger: 'after_meal',
+          activity: 'walk',
+          outcome: 'used',
+        );
       default:
         controller.completeCard(task['id']);
     }

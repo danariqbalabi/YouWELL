@@ -10,7 +10,6 @@ class LadderRung {
     required this.durationMinutes,
     this.activityKind,
     this.targetMeters,
-    this.delayMinutes,
     this.waterMl,
     this.photoCount,
     this.photoWindows,
@@ -22,7 +21,7 @@ class LadderRung {
   final String title, description;
   final int durationMinutes;
   final String? activityKind;
-  final int? targetMeters, delayMinutes, waterMl;
+  final int? targetMeters, waterMl;
 
   /// Meal photos needed (camera only). With [photoWindows], photo i must be
   /// taken between hour `start` (inclusive) and `end` (exclusive).
@@ -47,7 +46,7 @@ const ladderLabels = {
   'Food': 'Makan',
   'Lifestyle': 'Hidrasi',
   'Energy': 'Istirahat',
-  'Reduction': 'Jeda rokok/vape',
+  'Reduction': 'Ganti kebiasaan',
 };
 
 /// Low-impact users never enter the running part of the Body ladder.
@@ -283,42 +282,12 @@ const ladders = <String, List<LadderRung>>{
   ],
   'Reduction': [
     LadderRung(
-      title: 'Delay Craving 2 menit',
-      description: 'Saat ingin merokok atau vape, mulai timer dulu.',
-      durationMinutes: 2,
-      activityKind: 'delay',
-      delayMinutes: 2,
-    ),
-    LadderRung(
-      title: 'Delay Craving 5 menit',
-      description: 'Saat ingin merokok atau vape, mulai timer dulu.',
+      title: 'Coba satu aktivitas pengganti',
+      description:
+          'Saat ingin merokok atau vape, coba aktivitas lain yang cocok '
+          'dan catat yang sudah kamu lakukan di Habit Swap.',
       durationMinutes: 5,
-      activityKind: 'delay',
-      delayMinutes: 5,
-    ),
-    LadderRung(
-      title: 'Delay Craving 10 menit',
-      description: 'Tunda dan isi dengan Habit Swap.',
-      durationMinutes: 10,
-      activityKind: 'delay',
-      delayMinutes: 10,
-    ),
-    LadderRung(
-      title: 'Delay Craving 15 menit',
-      description: 'Tunda dan isi dengan Habit Swap.',
-      durationMinutes: 15,
-      activityKind: 'delay',
-      delayMinutes: 15,
-    ),
-    LadderRung(
-      title: 'Tunda yang pertama hari ini 30 menit',
-      description: 'Mundurkan rokok/vape pertama 30 menit dari biasanya.',
-      durationMinutes: 30,
-    ),
-    LadderRung(
-      title: 'Tunda yang pertama hari ini 1 jam',
-      description: 'Mundurkan rokok/vape pertama 1 jam dari biasanya.',
-      durationMinutes: 60,
+      activityKind: 'habit_swap',
     ),
   ],
   'Lifestyle': [
@@ -364,11 +333,11 @@ const ladders = <String, List<LadderRung>>{
 const healthyCategories = ['Body', 'Food', 'Lifestyle', 'Energy'];
 
 /// Every category with a ladder for this path: all healthy categories, plus
-/// Jeda (always on a card) for the smoking/vaping path.
+/// Habit Swap (always on a card) for the smoking/vaping path.
 List<String> ladderCategories({required bool reduction}) =>
     reduction ? const ['Reduction', ...healthyCategories] : healthyCategories;
 
-/// Ladder quests per card: 3 random healthy categories, or Jeda + 2 random.
+/// Ladder quests per card: 3 random healthy categories, or Habit Swap + 2 random.
 const ladderQuestsPerCard = 3;
 
 int ladderMax(

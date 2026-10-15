@@ -43,7 +43,6 @@ class HomePage extends StatelessWidget {
         task: task,
         onComplete: switch (task['activityKind']) {
           null => () => controller.completeCard(task['id'].toString()),
-          'delay' ||
           'habit_swap' => () => openReductionSupport(context, controller),
           _ => onOpenActivity,
         },
@@ -58,7 +57,7 @@ class HomePage extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          controller.wellnessUat
+          controller.uatProgram != null
               ? '28 hari membangun langkah kecil'
               : 'Hari ke-$dayNumber perjalananmu',
           style: text.bodyMedium?.copyWith(
@@ -67,7 +66,7 @@ class HomePage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        if (controller.wellnessUat) ...[
+        if (controller.uatProgram != null) ...[
           WellnessProgramCard(controller: controller),
           const SizedBox(height: 16),
         ],
@@ -76,7 +75,7 @@ class HomePage extends StatelessWidget {
           const SizedBox(height: 16),
           _LadderBanner(controller: controller),
         ],
-        if (!controller.wellnessProgramComplete) ...[
+        if (!controller.uatProgramComplete) ...[
           const SizedBox(height: 32),
           _TodayHeader(controller: controller),
           if (controller.quests.isEmpty && controller.needsDailyCardDraw)
@@ -571,7 +570,7 @@ const _shortLadder = {
   'Body': 'Gerak',
   'Food': 'Makan',
   'Energy': 'Istirahat',
-  'Reduction': 'Jeda',
+  'Reduction': 'Habit Swap',
   'Lifestyle': 'Hidrasi',
 };
 
@@ -596,8 +595,6 @@ class _QuestCard extends StatelessWidget {
         ? 'Selesai'
         : kind == null
         ? 'Tandai selesai'
-        : kind == 'delay'
-        ? 'Mulai timer Delay Craving'
         : kind == 'habit_swap'
         ? 'Pilih Habit Swap'
         : 'Buka Aktivitas untuk menyelesaikan';

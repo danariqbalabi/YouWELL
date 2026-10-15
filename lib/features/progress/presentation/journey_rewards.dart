@@ -14,19 +14,13 @@ const badgeVisuals = <String, (IconData, String)>{
     Icons.local_fire_department_rounded,
     'Aktif 4 hari dalam 7 hari',
   ),
-  'first-delay': (Icons.timer_rounded, 'Selesaikan 1 Delay Craving'),
-  'delay-30': (Icons.hourglass_bottom_rounded, 'Tunda total 30 menit'),
-  'delay-60': (Icons.hourglass_full_rounded, 'Tunda total 1 jam'),
-  'delay-300': (Icons.military_tech_rounded, 'Tunda total 5 jam'),
   'hydration-7': (Icons.water_drop_rounded, 'Capai target minum 7 hari'),
   'first-ladder': (Icons.stairs_rounded, 'Naik 1 anak tangga'),
 };
 
 /// Badges that apply to this user's path.
 Iterable<MapEntry<String, String>> visibleBadges(WellnessController c) =>
-    achievementNames.entries.where(
-      (entry) => c.reduction || !entry.key.contains('delay'),
-    );
+    achievementNames.entries;
 
 class JourneyRewards extends StatelessWidget {
   const JourneyRewards({super.key, required this.controller});

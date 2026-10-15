@@ -11,8 +11,9 @@
 | Daily Card | Lima kartu collectible, spin acak, swipe, reveal, satu kali ganti, commit; mobile punya Santai/Normal dan tema |
 | WELLNESS UAT | 28 hari kalender, panduan empat minggu, batas latihan ringan, rekomendasi sebelum reveal, rekap setelah hari ke-28 |
 | Aktivitas mobile | Foto/catatan makan lokal, timer/GPS foreground, hidrasi, riwayat detail, koreksi/hapus |
-| Delay Craving & Habit Swap | Timer tunda sesuai anak tangga + catatan Habit Swap, khusus jalur rokok/vape. Dibuka dari Home. Reset dihapus dari mobile (keputusan tim 6 Okt 2026) |
-| Perjalanan mobile | Ritme 4/7, kalender 28 hari, lencana, tangga quest, XP, aktivitas, total menit ditunda |
+| Reduction UAT | 28 hari kalender; pemicu–aktivitas–hasil, rencana pengganti, jurnal batang/sesi terpisah, rekap empat minggu, target opsional pilihan pengguna |
+| Habit Swap | Gerak ringan diprioritaskan dengan pilihan low-impact; hasil mencoba dihargai sama; ID pengiriman mencegah duplikat tanpa cooldown; XP misi hanya sekali |
+| Perjalanan mobile | Ritme 4/7, kalender 28 hari, lencana, tangga wellness, XP, aktivitas, jumlah Habit Swap |
 | Community mobile | Encouragement Wall lokal, post menunggu review, reaksi cepat, laporan; seed post berlabel contoh |
 | Admin web | Antrean post pending, setujui/tolak, laporan; tanpa onboarding, storage demo terpisah |
 | Profile | Tema, path, low-impact, kurangi animasi, getaran, ekspor/hapus lokal, persetujuan dan kode UAT |
@@ -39,13 +40,14 @@ Workspace desktop, landing, Focus Station, dan recap publik sudah dihapus.
 - Lima tema mobile: Gerak Ringan, Energi Segar, Istirahat, Hidrasi & Makan,
   Udara Segar. Quest pendamping produktivitas/relasi tidak masuk pool mobile.
 - Core Quest, tangga Istirahat/Hidrasi, dan quest reduction tetap ada.
-  Pada jalur reduction, Energi Segar menyediakan Habit Swap/pemicu sesuai level.
+  Pada jalur reduction, Habit Swap memakai pemicu, aktivitas, dan hasil momen;
+  tidak ada kenaikan durasi menunggu atau intensitas berdasarkan konsumsi.
 - Kartu yang sudah dibuka atau di-commit tidak diganti diam-diam.
 - Di WELLNESS, deadline makan yang lewat sebelum commit menampilkan alternatif
   dan meminta konfirmasi ulang. ID kartu dan kesempatan ganti tetap sama.
 - Kenaikan WELLNESS dimulai dari tanggal penerimaan dan hanya menggunakan
   bukti pada tingkat saat ini; aktivitas valid sebelum commit tetap dihitung.
-- Reset dihapus dari mobile; Delay Craving & Habit Swap dipindah ke halaman sendiri.
+- Reset dihapus dari mobile; Habit Swap tersedia pada halaman sendiri.
   Napas sebagai opsi Habit Swap tetap tersedia khusus jalur reduction.
 
 ## Aturan data dan penelitian

@@ -4,6 +4,7 @@ import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/core/theme/appearance_scope.dart';
 import 'package:youwell/features/companion/presentation/mobile_companion.dart';
 import 'package:youwell/shared/widgets/game_widgets.dart';
+import 'package:youwell/features/reduction/domain/reduction_policy.dart';
 
 /// Conversational onboarding: the companion asks one question per screen.
 class OnboardingPage extends StatefulWidget {
@@ -20,6 +21,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   String _companion = 'plant';
   bool _lowImpact = false;
   String? _ageGroup;
+  String? _nicotineProduct;
   String? _error;
   final _alias = TextEditingController();
 
@@ -32,6 +34,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
   /// Blocks "Lanjut" until the current step has what the rules require.
   String? _stepError() => switch (_step) {
     0 when _ageGroup == null => 'Pilih rentang usiamu dulu.',
+    1 when _path == 'reduction' && _nicotineProduct == null =>
+      'Pilih jenis penggunaanmu dulu.',
     _ => null,
   };
 
@@ -68,6 +72,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         'companion': _companion,
         'waterGoal': 2000,
         'ageGroup': _ageGroup,
+        if (_path == 'reduction') 'nicotineProduct': _nicotineProduct,
       });
     } catch (_) {
       setState(
@@ -215,11 +220,22 @@ class _OnboardingPageState extends State<OnboardingPage> {
         icon: Icons.smoke_free_rounded,
         title: _quitFraming ? 'Berhenti rokok / vape' : 'Kurangi rokok / vape',
         detail: _quitFraming
-            ? 'Latih jeda saat ingin, lalu ganti dengan aktivitas lain.'
-            : 'Tunda keinginan dan coba aktivitas pengganti, tanpa dihakimi.',
+            ? 'Kenali kebiasaan dan coba aktivitas pengganti saat ingin.'
+            : 'Coba aktivitas pengganti saat ingin, tanpa dihakimi.',
         selected: _path == 'reduction',
         onTap: () => _pick(() => _path = 'reduction'),
       ),
+      if (_path == 'reduction') ...[
+        const SizedBox(height: 12),
+        const Text('Apa yang kamu gunakan? Rokok dan vape dicatat terpisah.'),
+        for (final entry in nicotineProductLabels.entries)
+          _Option(
+            icon: Icons.smoke_free_rounded,
+            title: entry.value,
+            selected: _nicotineProduct == entry.key,
+            onTap: () => _pick(() => _nicotineProduct = entry.key),
+          ),
+      ],
     ],
     2 => [
       for (final (value, title, detail, icon) in const [

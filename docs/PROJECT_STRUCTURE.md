@@ -14,7 +14,7 @@ lib/
 │   ├── onboarding/      # personalisasi awal
 │   ├── profile/         # preferences dan kontrol data
 │   ├── progress/        # insight progress mobile
-│   └── reduction/       # Delay Craving & Habit Swap (jalur rokok/vape)
+│   └── reduction/       # Habit Swap tanpa timer (jalur rokok/vape)
 └── shared/widgets/      # komponen visual lintas fitur
 ```
 

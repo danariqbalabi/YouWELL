@@ -146,7 +146,7 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
 
   void _finish() {
     _pause();
-    if (widget.controller.wellnessProgramComplete) {
+    if (widget.controller.uatProgramComplete) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(

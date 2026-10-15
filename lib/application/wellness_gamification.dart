@@ -24,10 +24,6 @@ extension MobileWellnessRewards on WellnessController {
       _data['companionBackground']?.toString() ?? 'natural';
   Map<String, dynamic> get achievements =>
       Map<String, dynamic>.from(_data['achievements'] ?? {});
-  int get totalDelayMinutes => habitDelays.fold(
-    0,
-    (sum, row) => sum + max(0, (row['minutes'] as num?)?.toInt() ?? 0),
-  );
   int get mobileBonusXp =>
       ((_data['mobileRewards'] ?? {}) as Map).values.fold<int>(
         0,
@@ -69,7 +65,7 @@ extension MobileWellnessRewards on WellnessController {
   }
 
   bool setDailyPace(String value) {
-    if (wellnessProgramComplete) return false;
+    if (uatProgramComplete) return false;
     if (!const ['relaxed', 'normal'].contains(value) ||
         hasCommittedDailyCard ||
         selectedDailyCardId != null ||
@@ -103,10 +99,6 @@ extension MobileWellnessRewards on WellnessController {
       'first-quest': activeDays.isNotEmpty,
       'full-day': completedDays.isNotEmpty,
       'weekly-rhythm': activeDaysIn(7) >= 4,
-      'first-delay': habitDelays.any((row) => row['completed'] != false),
-      'delay-30': totalDelayMinutes >= 30,
-      'delay-60': totalDelayMinutes >= 60,
-      'delay-300': totalDelayMinutes >= 300,
       'hydration-7': hydrationDays >= 7,
       'first-ladder': capacity.values.any((row) => row['acceptedOn'] != null),
     };

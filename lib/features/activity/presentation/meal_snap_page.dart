@@ -113,7 +113,7 @@ class _MealSnapPageState extends State<MealSnapPage> {
   }
 
   bool _programEnded() {
-    if (!widget.controller.wellnessProgramComplete) return false;
+    if (!widget.controller.uatProgramComplete) return false;
     if (mounted) {
       setState(() {
         _saving = false;
