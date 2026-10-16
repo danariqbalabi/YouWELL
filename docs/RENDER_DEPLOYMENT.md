@@ -2,8 +2,8 @@
 
 Tujuan: menerbitkan dua **Static Site**, bukan Web Service/backend baru.
 Database dan Google Login tetap Supabase; Render hanya menyajikan Flutter web.
-Ini build uji coba: progres masih lokal per akun/perangkat, community dan
-moderasi masih demo lokal. Jangan menganggapnya sinkronisasi produksi.
+Ini build uji coba: sinkron profil/progres memerlukan migration tahap 2
+(`PROGRESS_SYNC.md`). Community dan moderasi masih demo lokal.
 
 ## 1. Hubungkan GitHub
 
@@ -68,8 +68,9 @@ Supabase → Authentication → URL Configuration:
 
 1. Buka mobile web, masuk Google, coba refresh dan logout/login.
 2. Bila consent Google masih Testing, daftarkan Gmail penguji di Test users.
-3. Progres localhost **tidak otomatis muncul** di domain Render. Ini origin
-   dan cache berbeda; sinkronisasi progres cloud belum diimplementasikan.
+3. Setelah migration tahap 2, akun yang sama bisa memakai progres cloud di
+   localhost/Render/APK terbaru. Cache dari sebelum sync yang berbeda tidak
+   digabung diam-diam; pengguna memilih versi dari panel Profil.
 4. Admin non-whitelist harus ditolak. Admin whitelist harus melalui TOTP.
    Semua setup SQL/whitelist dijelaskan pada `SUPABASE_SETUP.md`.
 5. Halaman admin yang antreannya kosong saat ini wajar: post peserta belum

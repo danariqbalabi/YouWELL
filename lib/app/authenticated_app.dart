@@ -11,6 +11,7 @@ import 'package:youwell/features/auth/data/supabase_auth_gateway.dart';
 import 'package:youwell/features/auth/presentation/account_scope.dart';
 import 'package:youwell/features/auth/presentation/auth_page.dart';
 import 'youwell_app.dart';
+import 'package:youwell/features/sync/data/supabase_progress_store.dart';
 
 class AuthenticatedApp extends StatefulWidget {
   const AuthenticatedApp({super.key, required this.preferences});
@@ -19,15 +20,23 @@ class AuthenticatedApp extends StatefulWidget {
   State<AuthenticatedApp> createState() => _AuthenticatedAppState();
 }
 
-class _AuthenticatedAppState extends State<AuthenticatedApp> {
+class _AuthenticatedAppState extends State<AuthenticatedApp>
+    with WidgetsBindingObserver {
   AppAuthController? _auth;
   Future<Supabase>? _initialization;
   String? _error;
   int _attempt = 0;
+  Timer? _syncTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _syncTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(_auth?.progress?.syncNow());
+      }
+    });
     unawaited(_connect());
   }
 
@@ -64,6 +73,12 @@ class _AuthenticatedAppState extends State<AuthenticatedApp> {
           surface: appSurface,
         ),
         surface: appSurface,
+        progressStore: (userId) => SupabaseProgressStore(
+          client: sdk.client,
+          userId: userId,
+          url: url.toString(),
+          publishableKey: AppEnvironment.supabasePublishableKey,
+        ),
       );
       setState(() => _auth = auth);
       auth.start();
@@ -82,7 +97,16 @@ class _AuthenticatedAppState extends State<AuthenticatedApp> {
   void dispose() {
     ++_attempt;
     _auth?.dispose();
+    _syncTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_auth?.progress?.syncNow());
+    }
   }
 
   @override

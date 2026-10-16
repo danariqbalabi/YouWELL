@@ -6,6 +6,7 @@
 | --- | --- |
 | Login (tahap 1) | Google OAuth PKCE, pemulihan sesi, logout, timeout/coba lagi; membutuhkan konfigurasi Supabase |
 | Isolasi akun | Cache per project/surface/UID, impor progres tamu eksplisit tanpa menghapus backup |
+| Sinkron progres (tahap 2) | Profil + snapshot quest/XP/reward, cache offline, expected revision, konflik eksplisit, backup sebelum penggantian; perlu migration kedua |
 | Onboarding | Pilih arah wellness/reduction, pace, low-impact, alias, companion |
 | Home mobile | Companion hero animasi/sentuh, feedback XP, 3–5 quest, tawaran tangga |
 | Companion mobile | 5 tahap tumbuh, evolusi visual, lemari aksesori/latar, target hadiah berikutnya |
@@ -22,7 +23,7 @@
 
 ## Sengaja ditunda
 
-- Sinkronisasi progres Supabase, pengiriman UAT, dan hapus akun server (login sudah tahap 1).
+- Pengiriman UAT dan hapus akun server (login/sinkron progres sudah tahap 1–2).
 - Identitas komunitas nyata, matching real-time, dan moderasi server.
 - Squad, Buddy, dan Vibe Map nyata: tetap roadmap, demo tidak ditampilkan di mobile.
 - Push notification dan reminder terjadwal.

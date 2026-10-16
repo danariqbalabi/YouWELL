@@ -324,6 +324,26 @@ class WellnessController extends ChangeNotifier {
     return _pending;
   }
 
+  /// Await pending device writes before resolving a cloud conflict.
+  Future<void> flush() => _pending;
+
+  /// A committed quest keeps the validation method of the originating device.
+  /// Web can use foreground GPS for an APK-created distance quest; a native
+  /// device can complete a web-created timed quest without changing its target.
+  bool get workoutUsesTimer {
+    final movement = quests.where(
+      (task) =>
+          const {'walk', 'run'}.contains(task['activityKind']) &&
+          (task['status'] != 'completed' ||
+              task['validationInvalidated'] == true),
+    );
+    if (movement.any((task) => ((task['targetMeters'] as num?) ?? 0) > 0)) {
+      return false;
+    }
+    if (movement.any((task) => task['timed'] == true)) return true;
+    return timedWorkouts;
+  }
+
   Future<void> setup(JsonMap value) async {
     final alias = value['alias'].toString().trim();
     if (!RegExp(r'^[a-zA-Z][a-zA-Z0-9_]{2,19}$').hasMatch(alias)) {

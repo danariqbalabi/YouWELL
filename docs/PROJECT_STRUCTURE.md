@@ -15,6 +15,7 @@ lib/
 │   ├── onboarding/      # personalisasi awal
 │   ├── profile/         # preferences dan kontrol data
 │   ├── progress/        # insight progress mobile
+│   ├── sync/            # proyeksi privat, snapshot cloud/CAS, status & konflik
 │   └── reduction/       # Delay Craving & Habit Swap (jalur rokok/vape)
 └── shared/widgets/      # komponen visual lintas fitur
 ```
@@ -44,8 +45,9 @@ Workspace desktop, landing, Pomodoro, dan recap publik sudah dihapus.
 ## Integrasi backend bertahap
 
 Login Google, cache per akun, whitelist server dan MFA sudah memiliki implementasi
-tahap 1; lihat `docs/SUPABASE_SETUP.md` dan `supabase/migrations/`. Repository
-progres cloud dan community multi-user belum dihubungkan. Admin hanya boleh
+tahap 1; lihat `docs/SUPABASE_SETUP.md` dan `supabase/migrations/`. Sinkron profil/
+progres versi snapshot tersedia tahap 2, lihat `docs/PROGRESS_SYNC.md`.
+Community multi-user belum dihubungkan. Admin hanya boleh
 mengakses data komunitas. Post peserta harus berstatus
 `pending`, lalu `approved`/`rejected` melalui keputusan server. Role tidak boleh
 ditentukan dari URL, alias, metadata yang bisa diubah pengguna, atau daftar email

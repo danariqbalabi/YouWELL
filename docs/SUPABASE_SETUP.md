@@ -1,4 +1,4 @@
-# Supabase + Google Login — tahap 1
+# Supabase + Google Login
 
 ## Status dan batasan
 
@@ -6,11 +6,11 @@ Kode login memakai `supabase_flutter` + OAuth PKCE, dengan pemulihan sesi,
 logout, dan pesan error/coba lagi. Android memakai browser eksternal lalu
 callback kembali ke APK. Web kembali ke origin build yang sedang dibuka.
 
-**Belum ada sinkronisasi progres, pengiriman UAT, community multi-user, atau
-hapus akun server.** Progres masih di perangkat, dipisahkan per project,
-surface, dan UID Supabase. Masuk di HP lain belum memindahkan progres.
-Migration tahap 1 menyiapkan alias privat dan otorisasi admin; aplikasi belum
-mengirim alias ke tabel tersebut. Moderasi tetap demo lokal, meskipun pintu
+**Sinkron progres tahap 2 tersedia setelah migration kedua**; lihat
+`PROGRESS_SYNC.md`. Pengiriman UAT, community multi-user, dan hapus akun server
+belum terhubung. Cache dipisahkan per project, surface, dan UID Supabase.
+Migration tahap 1 menyiapkan alias privat dan otorisasi admin; tahap 2 menulis
+alias secara atomik dengan progres. Moderasi tetap demo lokal, meskipun pintu
 masuk admin sekarang bisa dilindungi autentikasi + MFA.
 
 ## 1. Konfigurasi project
@@ -50,6 +50,8 @@ benar**, buat query baru, tempel seluruh isi:
 `supabase/migrations/20261016090000_create_auth_foundation.sql`
 
 Lalu Run. Migration transaksional ini tidak menghapus pengguna/data lama.
+Untuk sinkron profil/progres, jalankan berikutnya
+`supabase/migrations/20261016120000_create_progress_sync.sql`.
 Schema `private` tidak boleh ditambahkan ke daftar exposed schemas.
 
 Tabel `public.youwell_profiles` memakai RLS pemilik (`auth.uid() = user_id`)
@@ -110,11 +112,12 @@ Perubahan dependency/deep link memerlukan full rebuild, bukan hot reload saja.
 Setelah login, akun dengan cache kosong ditawari impor progres tamu bila ada.
 Pengguna harus memilih: gunakan progres tamu atau mulai baru. Impor tidak
 menimpa cache akun yang sudah ada, tidak menghapus salinan lama, dan hanya
-bisa diklaim satu akun/project. Tidak ada upload foto atau progres otomatis.
+bisa diklaim satu akun/project. Dengan migration tahap 2, progres tersinkron
+otomatis; file foto/catatan pribadi tidak ikut. Konflik meminta pilihan.
 
 Logout langsung menyembunyikan navigator/data akun, mempertahankan cache
-akun dan foto. Reset dari Profil menghapus catatan/foto milik akun pada
-perangkat, **bukan akun Supabase**, dan tidak menghapus foto akun lain.
+akun dan foto. Reset dari Profil meminta konfirmasi bahwa progres akan direset
+di perangkat **dan cloud**, bukan akun Supabase. Foto akun lain tidak dihapus.
 Cache lokal adalah isolasi aplikasi, bukan enkripsi/pengaman terhadap orang
 yang memiliki akses penuh ke perangkat atau developer tools.
 

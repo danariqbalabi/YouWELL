@@ -2,13 +2,14 @@
 
 YouWell adalah **better-life companion** untuk membangun ritme harian lewat
 langkah kecil, companion, dan progress yang tidak menghukum. Produk saat ini
-local-first. Tahap 1 Google Login melalui Supabase sudah tersedia, dengan cache
-per akun, impor progres tamu terkonfirmasi, dan pintu admin allowlist + TOTP.
-Migration/configuration perlu diterapkan sebelum uji login. Progres dan komunitas
-masih lokal: belum ada sinkronisasi atau pengguna komunitas nyata.
+local-first. Google Login, cache per akun, dan sinkron profil/progres Supabase
+tersedia, dengan konflik versi yang meminta pilihan pengguna. Migration tahap 1
+dan 2 perlu diterapkan. Admin memakai allowlist + TOTP; komunitas/moderasi masih
+demo lokal dan belum mempunyai pengguna komunitas nyata.
 
 Panduan langkah demi langkah: [Supabase Setup](docs/SUPABASE_SETUP.md).
 Hosting uji coba: [Render Deployment](docs/RENDER_DEPLOYMENT.md).
+Sinkron lintas perangkat: [Progress Sync](docs/PROGRESS_SYNC.md).
 
 ## Produk saat ini
 
@@ -131,8 +132,8 @@ Perbedaan versi web iPhone:
   dari **lama sesi**, bukan jarak. Anak tangganya sama (Jalan 400 m ↔ Jalan
   5 menit), sehingga `ladder_gerak` tetap sebanding dengan Android.
 - Foto Meal Snap dipakai sebagai bukti saat check-in lalu dibuang.
-- Data masih lokal pada browser/perangkat. Jangan mengandalkan versi ini untuk
-  sinkronisasi antarperangkat sebelum integrasi Supabase selesai.
+- Setelah migration tahap 2, profil/progres tersinkron per akun; foto/catatan
+  pribadi tetap lokal. Jika cache dan cloud berbeda, pilih salinan di Profil.
 
 Web admin memakai storage key `.admin-preview`, sehingga tidak membaca profil
 atau progres pribadi peserta. Pratinjau berbingkai memakai `.mobile-preview`.

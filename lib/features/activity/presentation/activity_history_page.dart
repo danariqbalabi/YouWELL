@@ -174,7 +174,7 @@ class _HistoryTile extends StatelessWidget {
                       ? (note.isNotEmpty
                             ? note
                             : capturedOnly
-                            ? 'Check-in selesai · foto tidak disimpan'
+                            ? 'Check-in selesai · foto tidak tersedia di perangkat ini'
                             : 'Ketuk untuk lihat foto')
                       : '$minutes menit · '
                             '${meters >= 1000 ? '${(meters / 1000).toStringAsFixed(2)} km' : '$meters m'}'
@@ -353,7 +353,7 @@ class _ActivityDetailPageState extends State<_ActivityDetailPage> {
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Meal Snap selesai. Foto hanya dipakai saat check-in dan tidak disimpan.',
+                            'Meal Snap selesai. File foto tidak tersedia di perangkat ini. Yang disinkronkan hanya catatan check-in, bukan file foto.',
                           ),
                         ),
                       ],

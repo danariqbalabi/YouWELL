@@ -16,7 +16,8 @@ dan user agent tidak menentukan apakah seseorang membuka admin atau aplikasi.
 
 ## Status saat ini
 
-Progres/community masih lokal. Saat auth aktif, admin memakai Google Login,
+Progres dapat disinkronkan setelah migration kedua; community masih lokal.
+Saat auth aktif, admin memakai Google Login,
 allowlist server, dan TOTP; belum menerima post dari Android atau browser peserta
 lain. Lihat `SUPABASE_SETUP.md` untuk migration, redirect, dan konfigurasi.
 Storage admin `.admin-preview` dipisahkan lagi per project/UID dari profil
@@ -50,8 +51,8 @@ Keduanya membutuhkan environment Supabase; deployment belum dipublikasikan dari 
 
 ## Tahap integrasi terakhir
 
-Tahap 1 login/cache akun/whitelist/MFA tersedia. Progres cloud dan community
-nyata belum dihubungkan. Target integrasi lengkap:
+Tahap 1 login/cache akun/whitelist/MFA dan tahap 2 progres cloud tersedia
+(perlu migration). Community nyata belum dihubungkan. Target integrasi lengkap:
 
 1. Login Google untuk aplikasi peserta dan web admin.
 2. Daftar Gmail admin tersimpan di database, kosong hingga pengelola mengisinya.

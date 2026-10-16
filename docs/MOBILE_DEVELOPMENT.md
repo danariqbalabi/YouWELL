@@ -36,8 +36,9 @@ capability iOS, archive, dan distribusi.
   Login Supabase/Google tersedia tahap 1; pengiriman ringkasan server belum aktif.
 - Ekspor data dan buka tautan sudah memakai API native.
 - Konfigurasi Google Login, cache akun dan callback APK ada di
-  `docs/SUPABASE_SETUP.md`. Callback membutuhkan full rebuild. Progres cloud,
-  push notification, dan production signing belum aktif.
+  `docs/SUPABASE_SETUP.md`. Callback membutuhkan full rebuild. Sinkron progres
+  perlu migration tahap 2 (`docs/PROGRESS_SYNC.md`); push notification dan
+  production signing belum aktif.
 - App icon dan launch screen masih placeholder Flutter dan harus diganti
   sebelum TestFlight.
 

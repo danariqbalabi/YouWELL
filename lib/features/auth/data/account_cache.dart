@@ -28,6 +28,40 @@ class AccountCache {
     }
   }
 
+  Future<Map<String, dynamic>?> readSyncMeta(String userId) async {
+    final raw = preferences.getString('${keyFor(userId)}.sync');
+    return raw == null
+        ? null
+        : Map<String, dynamic>.from(jsonDecode(raw) as Map);
+  }
+
+  Future<void> writeSyncMeta(String userId, Map<String, dynamic> value) async {
+    if (!await preferences.setString(
+      '${keyFor(userId)}.sync',
+      jsonEncode(value),
+    )) {
+      throw StateError('Status sinkron belum tersimpan.');
+    }
+  }
+
+  Future<void> backup(String userId, String raw) async {
+    if (!await preferences.setString('${keyFor(userId)}.before-cloud', raw)) {
+      throw StateError('Salinan pemulihan belum tersimpan.');
+    }
+  }
+
+  String? recoveryFor(String userId) =>
+      preferences.getString('${keyFor(userId)}.before-cloud');
+
+  Future<void> backupCloud(String userId, String raw) async {
+    if (!await preferences.setString('${keyFor(userId)}.replaced-cloud', raw)) {
+      throw StateError('Cadangan cloud belum tersimpan.');
+    }
+  }
+
+  String? cloudRecoveryFor(String userId) =>
+      preferences.getString('${keyFor(userId)}.replaced-cloud');
+
   Future<String?> legacyFor(String userId) async {
     if (surface == AppSurface.admin) return null;
     final owner = preferences.getString(_claimKey);

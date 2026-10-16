@@ -64,7 +64,7 @@ class AuthStagePage extends StatelessWidget {
     AuthStage.importChoice => AuthPage(
       title: 'Lanjutkan progresmu?',
       message:
-          'Ada progres tamu di perangkat ini. Hubungkan ke akun Google ini, atau mulai baru. Salinan lama tidak dihapus. Progres belum disinkronkan ke cloud.',
+          'Ada progres tamu di perangkat ini. Hubungkan ke akun Google ini, atau mulai baru. Salinan lama tidak dihapus. Jika berbeda dengan cloud, kamu akan diminta memilih progres yang ingin dilanjutkan.',
       actions: [
         FilledButton(
           onPressed: () => auth.chooseLegacy(import: true),
@@ -106,7 +106,7 @@ class AuthStagePage extends StatelessWidget {
       title: 'Selamat datang di YouWELL',
       message:
           auth.error ??
-          'Masuk untuk memakai akunmu. Komunitas tetap menggunakan alias, bukan nama Google. Pada tahap ini progres masih tersimpan di perangkat.',
+          'Lanjutkan progres di perangkatmu lewat akun Google. Komunitas tetap menggunakan alias; foto dan catatan pribadi tidak diunggah.',
       actions: [
         FilledButton.icon(
           onPressed: auth.signIn,
