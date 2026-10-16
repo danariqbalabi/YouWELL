@@ -24,6 +24,9 @@ class ProgressSyncController extends ChangeNotifier {
   final Duration timeout, debounce;
   SyncStage stage = SyncStage.idle;
   String? error;
+
+  /// Technical reason of the last failure, shown small for troubleshooting.
+  String? errorDetail;
   DateTime? lastSyncedAt;
   CloudProgressSnapshot? conflict;
   bool _missingConflict = false;
@@ -54,7 +57,13 @@ class ProgressSyncController extends ChangeNotifier {
     if (_disposed) return;
     stage = value;
     error = message;
+    if (value != SyncStage.offline) errorDetail = null;
     _notify();
+  }
+
+  static String _describe(Object error) {
+    final text = error.toString().replaceAll(RegExp(r'\s+'), ' ');
+    return text.length > 180 ? '${text.substring(0, 180)}…' : text;
   }
 
   Future<String?> open(String? local) async {
@@ -66,7 +75,8 @@ class ProgressSyncController extends ChangeNotifier {
       _sent = meta?['sent'] as String?;
       lastSyncedAt = DateTime.tryParse(meta?['syncedAt']?.toString() ?? '');
       await _exchange(initial: true);
-    } catch (_) {
+    } catch (error) {
+      errorDetail = _describe(error);
       _set(
         SyncStage.offline,
         'Cloud belum terhubung. Progres tetap tersimpan di perangkat.',
@@ -179,7 +189,8 @@ class ProgressSyncController extends ChangeNotifier {
         // Runtime pulls never replace a running timer or an open draw dialog.
         _conflict(cloud);
       }
-    } catch (_) {
+    } catch (error) {
+      errorDetail = _describe(error);
       _set(
         SyncStage.offline,
         'Belum tersinkron. Periksa koneksi atau jalankan migration progres, lalu coba lagi.',

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/community_store.dart';
+import 'package:youwell/features/auth/data/fresh_session.dart';
 
 /// Community through the phase 3 RPCs only; tables are not exposed directly.
 class SupabaseCommunityStore implements CommunityStore {
@@ -18,9 +19,13 @@ class SupabaseCommunityStore implements CommunityStore {
   // As in progress sync: bind each request to this account's JWT, so an
   // account switch can never send A's action as B.
   Future<T> _call<T>(String function, [Map<String, dynamic>? params]) async {
-    final session = client.auth.currentSession;
-    if (session == null || session.user.id != userId) {
-      throw const CommunityException('Sesi akun berubah. Buka ulang Community.');
+    final Session session;
+    try {
+      session = await freshSession(client, userId);
+    } catch (_) {
+      throw const CommunityException(
+        'Sesi login perlu diperbarui. Periksa koneksi lalu coba lagi.',
+      );
     }
     final request = PostgrestClient(
       '$url/rest/v1',
