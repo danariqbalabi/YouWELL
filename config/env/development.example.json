@@ -4,5 +4,9 @@
   "LOCAL_STORAGE_KEY": "youwell.local.v3",
   "SHOW_PREVIEW_TOOLS": "true",
   "PLAY_STORE_URL": "",
-  "APP_STORE_URL": ""
+  "APP_STORE_URL": "",
+  "AUTH_ENABLED": "false",
+  "SUPABASE_URL": "",
+  "SUPABASE_PUBLISHABLE_KEY": "",
+  "AUTH_REDIRECT_URL": "com.youwell.app://login-callback/"
 }

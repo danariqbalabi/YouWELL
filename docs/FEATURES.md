@@ -4,6 +4,8 @@
 
 | Area | Implementasi |
 | --- | --- |
+| Login (tahap 1) | Google OAuth PKCE, pemulihan sesi, logout, timeout/coba lagi; membutuhkan konfigurasi Supabase |
+| Isolasi akun | Cache per project/surface/UID, impor progres tamu eksplisit tanpa menghapus backup |
 | Onboarding | Pilih arah wellness/reduction, pace, low-impact, alias, companion |
 | Home mobile | Companion hero animasi/sentuh, feedback XP, 3–5 quest, tawaran tangga |
 | Companion mobile | 5 tahap tumbuh, evolusi visual, lemari aksesori/latar, target hadiah berikutnya |
@@ -14,13 +16,13 @@
 | Delay Craving & Habit Swap | Timer tunda sesuai anak tangga + catatan Habit Swap, khusus jalur rokok/vape. Dibuka dari Home. Reset dihapus dari mobile (keputusan tim 6 Okt 2026) |
 | Perjalanan mobile | Ritme 4/7, kalender 28 hari, lencana, tangga quest, XP, aktivitas, total menit ditunda |
 | Community mobile | Encouragement Wall lokal, post menunggu review, reaksi cepat, laporan; seed post berlabel contoh |
-| Admin web | Antrean post pending, setujui/tolak, laporan; tanpa onboarding, storage demo terpisah |
+| Admin web | Google Login + allowlist server + TOTP saat auth aktif; moderasi masih data demo lokal, bukan post peserta |
 | Profile | Tema, path, low-impact, kurangi animasi, getaran, ekspor/hapus lokal, persetujuan dan kode UAT |
 | Web iPhone | AppShell mobile tanpa bingkai, timer gerak tanpa GPS, build Render tersendiri |
 
 ## Sengaja ditunda
 
-- Google Auth dan Supabase sync.
+- Sinkronisasi progres Supabase, pengiriman UAT, dan hapus akun server (login sudah tahap 1).
 - Identitas komunitas nyata, matching real-time, dan moderasi server.
 - Squad, Buddy, dan Vibe Map nyata: tetap roadmap, demo tidak ditampilkan di mobile.
 - Push notification dan reminder terjadwal.

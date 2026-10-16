@@ -8,6 +8,7 @@ lib/
 ├── data/                # snapshot dan repository lokal
 ├── features/
 │   ├── activity/        # gerak, Meal Snap, hidrasi, riwayat
+│   ├── auth/            # gateway Google OAuth, cache akun, UI login/MFA
 │   ├── companion/       # evolusi, aksesori, animasi reward mobile
 │   ├── community/       # Wall (post, reaksi, lapor), Admin
 │   ├── home/            # companion, quest, Daily Card
@@ -40,11 +41,12 @@ ini sengaja kecil agar UX dapat diubah cepat sebelum kontrak backend dibekukan.
 mobile dan preview aktif sekaligus, aplikasi menolak konfigurasi itu.
 Workspace desktop, landing, Pomodoro, dan recap publik sudah dihapus.
 
-## Integrasi backend nanti
+## Integrasi backend bertahap
 
-Implementasi backend dan autentikasi ditunda ke tahap terakhir sesuai urutan kerja.
-Tambahkan login Google, whitelist Gmail di server, MFA admin, RLS, dan repository
-Supabase. Admin hanya mengakses data komunitas. Post peserta harus berstatus
+Login Google, cache per akun, whitelist server dan MFA sudah memiliki implementasi
+tahap 1; lihat `docs/SUPABASE_SETUP.md` dan `supabase/migrations/`. Repository
+progres cloud dan community multi-user belum dihubungkan. Admin hanya boleh
+mengakses data komunitas. Post peserta harus berstatus
 `pending`, lalu `approved`/`rejected` melalui keputusan server. Role tidak boleh
 ditentukan dari URL, alias, metadata yang bisa diubah pengguna, atau daftar email
 di Flutter. Foto dan rute GPS tidak diunggah.

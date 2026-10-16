@@ -18,15 +18,21 @@ flutter_bin=.tools/flutter/bin/flutter
 "$flutter_bin" config --no-analytics >/dev/null
 "$flutter_bin" pub get
 
-# Authentication and Supabase will be connected in the final integration phase.
+# Public client configuration only; never put a service role / secret key here.
 mkdir -p build
 node -e '
   const env = process.env;
+  if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY?.startsWith("sb_publishable_")) {
+    throw new Error("Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in Render first.");
+  }
   const config = {
     APP_NAME: "YouWELL",
     APP_ENV: "production",
     LOCAL_STORAGE_KEY: env.LOCAL_STORAGE_KEY || "youwell.local.v3",
     SHOW_PREVIEW_TOOLS: "false",
+    AUTH_ENABLED: "true",
+    SUPABASE_URL: env.SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY: env.SUPABASE_PUBLISHABLE_KEY,
   };
   require("fs").writeFileSync("build/render-env.json", JSON.stringify(config));
 '

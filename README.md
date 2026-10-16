@@ -2,8 +2,13 @@
 
 YouWell adalah **better-life companion** untuk membangun ritme harian lewat
 langkah kecil, companion, dan progress yang tidak menghukum. Produk saat ini
-local-first: belum ada Google Auth, Supabase, pengguna komunitas nyata, atau
-data cloud.
+local-first. Tahap 1 Google Login melalui Supabase sudah tersedia, dengan cache
+per akun, impor progres tamu terkonfirmasi, dan pintu admin allowlist + TOTP.
+Migration/configuration perlu diterapkan sebelum uji login. Progres dan komunitas
+masih lokal: belum ada sinkronisasi atau pengguna komunitas nyata.
+
+Panduan langkah demi langkah: [Supabase Setup](docs/SUPABASE_SETUP.md).
+Hosting uji coba: [Render Deployment](docs/RENDER_DEPLOYMENT.md).
 
 ## Produk saat ini
 
@@ -65,8 +70,8 @@ diperbarui sebelum konfirmasi. Detail ada di `docs/CHALLENGE_SPEC.md`.
 
 Data versi lokal sebelumnya tetap didukung. Quest yang sudah di-commit tidak
 diganti oleh pembaruan. Pengingat terjadwal, backend, dan UAT native lengkap
-iOS/Android masih tahap berikutnya. Google Auth, Supabase, MFA admin, dan whitelist
-Gmail sengaja ditunda ke tahap integrasi terakhir. Moderasi saat ini hanya demo
+iOS/Android masih tahap berikutnya. Login, MFA admin, dan whitelist server sudah
+memiliki implementasi tahap 1; pengujian OAuth/MFA langsung belum selesai. Moderasi saat ini hanya demo
 lokal; belum menerima post dari perangkat lain.
 
 ## Menjalankan
@@ -117,8 +122,8 @@ Deploy web memakai [`render.yaml`](render.yaml) (static site gratis). Build-nya
 menyiapkan dua static site: `youwell` menjalankan `scripts/render-build.sh mobile`,
 dan `youwell-admin` menjalankan `scripts/render-build.sh admin`. Keduanya memakai
 Flutter 3.47.7. Blueprint ini belum dipublikasikan dari sesi pengembangan.
-Konfigurasi Supabase dan login Google belum digunakan; akan ditambahkan pada
-tahap integrasi terakhir, termasuk whitelist Gmail yang diperiksa di server.
+Isi `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY` pada kedua site di Render.
+Ikuti migration dan pengaturan redirect pada `docs/SUPABASE_SETUP.md`.
 
 Perbedaan versi web iPhone:
 
