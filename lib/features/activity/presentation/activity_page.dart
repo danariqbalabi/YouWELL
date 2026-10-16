@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/features/activity/presentation/activity_history_page.dart';
@@ -53,7 +54,7 @@ class ActivityPage extends StatelessWidget {
           (sum, row) => sum + ((row['seconds'] as num?)?.toInt() ?? 0),
         ) ~/
         60;
-    final timed = controller.timedWorkouts;
+    final timed = controller.workoutUsesTimer;
     // The open quest each action below finishes, shown on that action.
     Map<String, dynamic>? openQuest(Set<String> kinds) => controller.quests
         .where(
@@ -109,6 +110,8 @@ class ActivityPage extends StatelessWidget {
           title: 'Jalan atau lari',
           detail: timed
               ? 'Dihitung dari waktu. Boleh kunci layar.'
+              : kIsWeb
+              ? 'Misi GPS dari APK. Biarkan layar dan halaman ini terbuka.'
               : 'Boleh kunci layar. Rute tidak disimpan.',
           quest: moveQuest,
           onTap: () => _open(context, WorkoutPage(controller: controller)),

@@ -5,6 +5,7 @@ import 'package:youwell/core/theme/appearance_scope.dart';
 import 'package:youwell/features/companion/presentation/mobile_companion.dart';
 import 'package:youwell/shared/widgets/game_widgets.dart';
 import 'package:youwell/features/reduction/domain/reduction_policy.dart';
+import 'package:youwell/features/auth/presentation/account_scope.dart';
 
 /// Conversational onboarding: the companion asks one question per screen.
 class OnboardingPage extends StatefulWidget {
@@ -312,6 +313,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
           helperText: '3–20 karakter, diawali huruf.',
         ),
       ),
+      if (AccountScope.maybeOf(context)?.progress != null) ...[
+        const SizedBox(height: 8),
+        const Text(
+          'Profil dan progres disinkronkan ke akunmu. Foto dan catatan pribadi tetap di perangkat.',
+        ),
+      ],
     ],
   };
 }

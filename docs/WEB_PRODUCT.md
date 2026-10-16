@@ -16,8 +16,11 @@ dan user agent tidak menentukan apakah seseorang membuka admin atau aplikasi.
 
 ## Status saat ini
 
-Semua data masih lokal. Admin belum login dan belum menerima post dari Android
-atau browser peserta lain. Storage admin `.admin-preview` terpisah dari profil
+Progres dapat disinkronkan setelah migration kedua; community masih lokal.
+Saat auth aktif, admin memakai Google Login,
+allowlist server, dan TOTP; belum menerima post dari Android atau browser peserta
+lain. Lihat `SUPABASE_SETUP.md` untuk migration, redirect, dan konfigurasi.
+Storage admin `.admin-preview` dipisahkan lagi per project/UID dari profil
 peserta. Tombol Tambah contoh post hanya tersedia saat preview tools aktif;
 post fixture ditandai Contoh lokal. Setujui/tolak dan penanganan laporan tetap
 dapat diuji di pratinjau ini.
@@ -44,12 +47,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1 -BuildW
 
 `render.yaml` menyiapkan dua static site: youwell (mobile) dan youwell-admin
 (admin). Keduanya menggunakan script yang sama dengan argumen build berbeda.
-Konfigurasi ini belum menerapkan login atau mempublikasikan deployment.
+Keduanya membutuhkan environment Supabase; deployment belum dipublikasikan dari sesi ini.
 
 ## Tahap integrasi terakhir
 
-Sesuai urutan kerja, Supabase dan Google Auth baru diimplementasikan setelah
-alur aplikasi stabil. Rencana integrasinya:
+Tahap 1 login/cache akun/whitelist/MFA dan tahap 2 progres cloud tersedia
+(perlu migration). Community nyata belum dihubungkan. Target integrasi lengkap:
 
 1. Login Google untuk aplikasi peserta dan web admin.
 2. Daftar Gmail admin tersimpan di database, kosong hingga pengelola mengisinya.

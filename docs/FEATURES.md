@@ -4,6 +4,9 @@
 
 | Area | Implementasi |
 | --- | --- |
+| Login (tahap 1) | Google OAuth PKCE, pemulihan sesi, logout, timeout/coba lagi; membutuhkan konfigurasi Supabase |
+| Isolasi akun | Cache per project/surface/UID, impor progres tamu eksplisit tanpa menghapus backup |
+| Sinkron progres (tahap 2) | Profil + snapshot quest/XP/reward, cache offline, expected revision, konflik eksplisit, backup sebelum penggantian; perlu migration kedua |
 | Onboarding | Pilih arah wellness/reduction, pace, low-impact, alias, companion |
 | Home mobile | Companion hero animasi/sentuh, feedback XP, 3–5 quest, tawaran tangga |
 | Companion mobile | 5 tahap tumbuh, evolusi visual, lemari aksesori/latar, target hadiah berikutnya |
@@ -15,13 +18,13 @@
 | Habit Swap | Gerak ringan diprioritaskan dengan pilihan low-impact; hasil mencoba dihargai sama; ID pengiriman mencegah duplikat tanpa cooldown; XP misi hanya sekali |
 | Perjalanan mobile | Ritme 4/7, kalender 28 hari, lencana, tangga wellness, XP, aktivitas, jumlah Habit Swap |
 | Community mobile | Encouragement Wall lokal, post menunggu review, reaksi cepat, laporan; seed post berlabel contoh |
-| Admin web | Antrean post pending, setujui/tolak, laporan; tanpa onboarding, storage demo terpisah |
+| Admin web | Google Login + allowlist server + TOTP saat auth aktif; moderasi masih data demo lokal, bukan post peserta |
 | Profile | Tema, path, low-impact, kurangi animasi, getaran, ekspor/hapus lokal, persetujuan dan kode UAT |
 | Web iPhone | AppShell mobile tanpa bingkai, timer gerak tanpa GPS, build Render tersendiri |
 
 ## Sengaja ditunda
 
-- Google Auth dan Supabase sync.
+- Pengiriman UAT dan hapus akun server (login/sinkron progres sudah tahap 1–2).
 - Identitas komunitas nyata, matching real-time, dan moderasi server.
 - Squad, Buddy, dan Vibe Map nyata: tetap roadmap, demo tidak ditampilkan di mobile.
 - Push notification dan reminder terjadwal.

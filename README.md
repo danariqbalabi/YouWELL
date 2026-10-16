@@ -2,8 +2,14 @@
 
 YouWell adalah **better-life companion** untuk membangun ritme harian lewat
 langkah kecil, companion, dan progress yang tidak menghukum. Produk saat ini
-local-first: belum ada Google Auth, Supabase, pengguna komunitas nyata, atau
-data cloud.
+local-first. Google Login, cache per akun, dan sinkron profil/progres Supabase
+tersedia, dengan konflik versi yang meminta pilihan pengguna. Migration tahap 1
+dan 2 perlu diterapkan. Admin memakai allowlist + TOTP; komunitas/moderasi masih
+demo lokal dan belum mempunyai pengguna komunitas nyata.
+
+Panduan langkah demi langkah: [Supabase Setup](docs/SUPABASE_SETUP.md).
+Hosting uji coba: [Render Deployment](docs/RENDER_DEPLOYMENT.md).
+Sinkron lintas perangkat: [Progress Sync](docs/PROGRESS_SYNC.md).
 
 ## Produk saat ini
 
@@ -18,11 +24,12 @@ data cloud.
 
 ## Gamifikasi mobile
 
-WELLNESS UAT kini berlangsung **28 hari kalender** sejak onboarding. Empat
+Kedua jalur UAT berlangsung **28 hari kalender** sejak onboarding. Empat
 minggunya memandu mulai pelan, pengulangan, menemukan ritme, dan mempertahankan
 kebiasaan yang cocok. Satu misi pada 4 dari 7 hari menjadi arah ritme, tanpa
 streak atau kenaikan wajib. Setelah hari ke-28 tersedia rekap dan riwayat,
-tanpa challenge baru. Path rokok/vape belum direvisi pada tahap ini.
+tanpa challenge baru. Path rokok/vape memakai Habit Swap tanpa timer, jurnal
+konsumsi per jenis, dan target mingguan opsional; lihat `docs/REDUCTION_UAT.md`.
 
 Gerak WELLNESS dibatasi sampai jalan 1,5 km / 20 menit web, tanpa lari; Makan
 sampai dua foto, Istirahat sampai layar off 30 menit, dan Hidrasi sampai tangga
@@ -65,8 +72,8 @@ diperbarui sebelum konfirmasi. Detail ada di `docs/CHALLENGE_SPEC.md`.
 
 Data versi lokal sebelumnya tetap didukung. Quest yang sudah di-commit tidak
 diganti oleh pembaruan. Pengingat terjadwal, backend, dan UAT native lengkap
-iOS/Android masih tahap berikutnya. Google Auth, Supabase, MFA admin, dan whitelist
-Gmail sengaja ditunda ke tahap integrasi terakhir. Moderasi saat ini hanya demo
+iOS/Android masih tahap berikutnya. Login, MFA admin, dan whitelist server sudah
+memiliki implementasi tahap 1; pengujian OAuth/MFA langsung belum selesai. Moderasi saat ini hanya demo
 lokal; belum menerima post dari perangkat lain.
 
 ## Menjalankan
@@ -117,8 +124,8 @@ Deploy web memakai [`render.yaml`](render.yaml) (static site gratis). Build-nya
 menyiapkan dua static site: `youwell` menjalankan `scripts/render-build.sh mobile`,
 dan `youwell-admin` menjalankan `scripts/render-build.sh admin`. Keduanya memakai
 Flutter 3.47.7. Blueprint ini belum dipublikasikan dari sesi pengembangan.
-Konfigurasi Supabase dan login Google belum digunakan; akan ditambahkan pada
-tahap integrasi terakhir, termasuk whitelist Gmail yang diperiksa di server.
+Isi `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY` pada kedua site di Render.
+Ikuti migration dan pengaturan redirect pada `docs/SUPABASE_SETUP.md`.
 
 Perbedaan versi web iPhone:
 
@@ -126,8 +133,8 @@ Perbedaan versi web iPhone:
   dari **lama sesi**, bukan jarak. Anak tangganya sama (Jalan 400 m ↔ Jalan
   5 menit), sehingga `ladder_gerak` tetap sebanding dengan Android.
 - Foto Meal Snap dipakai sebagai bukti saat check-in lalu dibuang.
-- Data masih lokal pada browser/perangkat. Jangan mengandalkan versi ini untuk
-  sinkronisasi antarperangkat sebelum integrasi Supabase selesai.
+- Setelah migration tahap 2, profil/progres tersinkron per akun; foto/catatan
+  pribadi tetap lokal. Jika cache dan cloud berbeda, pilih salinan di Profil.
 
 Web admin memakai storage key `.admin-preview`, sehingga tidak membaca profil
 atau progres pribadi peserta. Pratinjau berbingkai memakai `.mobile-preview`.

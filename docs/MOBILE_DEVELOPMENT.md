@@ -33,10 +33,12 @@ capability iOS, archive, dan distribusi.
 - Persetujuan UAT P1–P10 tersedia di Profil; ringkasan angka diekspor manual.
   `active_days` = hari unik membuka aplikasi, bukan hari quest selesai.
   Buat ulang ekspor lama; schema ringkasan terbaru versi 2.
-  Auth dan pengiriman ringkasan server belum aktif.
+  Login Supabase/Google tersedia tahap 1; pengiriman ringkasan server belum aktif.
 - Ekspor data dan buka tautan sudah memakai API native.
-- Supabase, Google Sign-In, push notification, dan production signing belum
-  diaktifkan. Tambahkan setelah alur mobile stabil.
+- Konfigurasi Google Login, cache akun dan callback APK ada di
+  `docs/SUPABASE_SETUP.md`. Callback membutuhkan full rebuild. Sinkron progres
+  perlu migration tahap 2 (`docs/PROGRESS_SYNC.md`); push notification dan
+  production signing belum aktif.
 - App icon dan launch screen masih placeholder Flutter dan harus diganti
   sebelum TestFlight.
 

@@ -4,6 +4,11 @@ services:
   - type: web
     runtime: static
     name: youwell
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
     buildCommand: bash scripts/render-build.sh mobile
     staticPublishPath: build/web
     pullRequestPreviewsEnabled: false
@@ -25,6 +30,11 @@ services:
   - type: web
     runtime: static
     name: youwell-admin
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
     buildCommand: bash scripts/render-build.sh admin
     staticPublishPath: build/web
     pullRequestPreviewsEnabled: false

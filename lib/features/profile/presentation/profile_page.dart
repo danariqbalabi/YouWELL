@@ -10,6 +10,8 @@ import 'package:youwell/shared/widgets/game_widgets.dart';
 import 'package:youwell/features/companion/presentation/mobile_companion.dart';
 import 'package:youwell/features/companion/domain/companion_rewards.dart';
 import 'package:youwell/features/reduction/presentation/reduction_support_page.dart';
+import 'package:youwell/features/auth/presentation/account_scope.dart';
+import 'package:youwell/features/sync/presentation/progress_sync_panel.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({
@@ -80,17 +82,24 @@ class ProfilePage extends StatelessWidget {
       controller.switchPath(enabled);
 
   @override
-  Widget build(BuildContext context) =>
-      mobileExperience ? _mobileBuild(context) : _webBuild(context);
+  Widget build(BuildContext context) {
+    if (controller.profile == null) return const SizedBox.shrink();
+    return mobileExperience ? _mobileBuild(context) : _webBuild(context);
+  }
 
   Future<void> _confirmReset(BuildContext context) async {
+    final syncing = AccountScope.maybeOf(context)?.progress != null;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Hapus semua data?'),
-        content: const Text(
-          'Profil, progress, dan foto Meal Snap di perangkat ini akan dihapus. '
-          'Ini tidak bisa dibatalkan.',
+        title: Text(
+          syncing ? 'Mulai ulang progres akun?' : 'Hapus semua data?',
+        ),
+        content: Text(
+          syncing
+              ? 'Quest, XP, dan progres akun akan direset di perangkat ini lalu dikirim ke cloud saat terhubung. Foto milik akun ini di perangkat akan dihapus dan tidak bisa dipulihkan. Akun Google/Supabase tidak dihapus.'
+              : 'Profil, progress, dan foto Meal Snap di perangkat ini akan dihapus. '
+                    'Ini tidak bisa dibatalkan.',
         ),
         actions: [
           TextButton(
@@ -109,7 +118,12 @@ class ProfilePage extends StatelessWidget {
       ),
     );
     if (confirmed == true) {
-      await MealPhotoStore.clear();
+      // Photos belonging to other cached accounts must survive this reset.
+      for (final meal in controller.mealCheckIns) {
+        if (meal['photoPath'] case final String path) {
+          await MealPhotoStore.delete(path);
+        }
+      }
       await controller.reset();
       if (context.mounted) Navigator.pop(context);
     }
@@ -320,15 +334,50 @@ class ProfilePage extends StatelessWidget {
                 ),
                 _Row(
                   icon: Icons.delete_outline_rounded,
-                  label: 'Hapus data & mulai ulang',
+                  label: AccountScope.maybeOf(context)?.progress == null
+                      ? 'Hapus data & mulai ulang'
+                      : 'Mulai ulang progres akun',
                   danger: true,
                   onTap: () => _confirmReset(context),
                 ),
               ],
             ),
+            if (AccountScope.maybeOf(context) case final account?) ...[
+              const SizedBox(height: 16),
+              ProgressSyncPanel(auth: account),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('Keluar dari akun?'),
+                      content: const Text(
+                        'Progres yang belum tersinkron tetap tersimpan pada perangkat ini untuk akunmu. Keluar tidak menghapus akun atau progres. Pastikan status sinkron selesai sebelum berpindah perangkat.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, false),
+                          child: const Text('Batal'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(dialogContext, true),
+                          child: const Text('Keluar'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) await account.signOut();
+                },
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Keluar dari akun'),
+              ),
+            ],
             const SizedBox(height: 16),
             Text(
-              'Data tersimpan di perangkat ini. Foto Meal Snap tidak pernah diunggah.',
+              AccountScope.maybeOf(context)?.progress == null
+                  ? 'Data tersimpan di perangkat ini. Foto Meal Snap tidak pernah diunggah.'
+                  : 'Progres disinkronkan ke Supabase saat terhubung. Foto dan catatan pribadi tetap di perangkat; rute tidak diunggah.',
               textAlign: TextAlign.center,
               style: TextStyle(color: c.muted, fontSize: 12.5),
             ),

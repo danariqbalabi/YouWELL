@@ -11,6 +11,8 @@ import 'package:youwell/features/home/presentation/home_page.dart';
 import 'package:youwell/features/profile/presentation/profile_page.dart';
 import 'package:youwell/features/progress/presentation/progress_page.dart';
 import 'package:youwell/features/companion/presentation/mobile_reward_host.dart';
+import 'package:youwell/features/auth/presentation/account_scope.dart';
+import 'package:youwell/features/sync/presentation/progress_sync_panel.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.controller});
@@ -113,6 +115,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         body: SafeArea(
           child: Column(
             children: [
+              if (AccountScope.maybeOf(context) case final account?)
+                ProgressSyncPanel(auth: account, compact: true),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 10, 12, 8),
                 child: Row(
