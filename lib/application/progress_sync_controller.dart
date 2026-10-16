@@ -30,8 +30,12 @@ class ProgressSyncController extends ChangeNotifier {
   int _revision = 0;
   String? _base;
   String? _raw;
-  bool _busy = false, _disposed = false;
+  bool _busy = false, _disposed = false, _rerun = false;
+  Completer<void>? _running;
   Timer? _debouncer;
+
+  /// Canonical payload of an upload whose reply may have been lost.
+  String? _sent;
 
   bool get pending =>
       _raw != null &&
@@ -59,6 +63,7 @@ class ProgressSyncController extends ChangeNotifier {
       final meta = await cache.readSyncMeta(userId);
       _revision = (meta?['revision'] as num?)?.toInt() ?? 0;
       _base = meta?['base'] as String?;
+      _sent = meta?['sent'] as String?;
       lastSyncedAt = DateTime.tryParse(meta?['syncedAt']?.toString() ?? '');
       await _exchange(initial: true);
     } catch (_) {
@@ -85,13 +90,17 @@ class ProgressSyncController extends ChangeNotifier {
   Future<void> _ack(CloudProgressSnapshot value) async {
     _revision = value.revision;
     _base = CloudProgress.canonical(value.payload);
+    _sent = null;
     lastSyncedAt = value.updatedAt;
-    await cache.writeSyncMeta(userId, {
-      'revision': _revision,
-      'base': _base,
-      'syncedAt': lastSyncedAt!.toIso8601String(),
-    });
+    await _writeMeta();
   }
+
+  Future<void> _writeMeta() => cache.writeSyncMeta(userId, {
+    'revision': _revision,
+    'base': _base,
+    'sent': ?_sent,
+    'syncedAt': ?lastSyncedAt?.toIso8601String(),
+  });
 
   void _conflict(CloudProgressSnapshot? value) {
     conflict = value;
@@ -120,8 +129,14 @@ class ProgressSyncController extends ChangeNotifier {
   }
 
   Future<void> _exchange({required bool initial}) async {
-    if (_busy || _disposed) return;
+    if (_disposed) return;
+    if (_busy) {
+      // An edit during a running request gets its own exchange afterwards.
+      _rerun = true;
+      return;
+    }
     _busy = true;
+    final running = _running = Completer<void>();
     _set(SyncStage.syncing);
     try {
       final cloud = await remote.read().timeout(timeout);
@@ -152,6 +167,14 @@ class ProgressSyncController extends ChangeNotifier {
         await _adopt(cloud, notifyApp: false);
       } else if (_revision == cloud.revision && _base == cloudKey) {
         await _upload();
+      } else if (cloudKey == _sent) {
+        // Our own upload committed but its reply was lost: not a conflict.
+        await _ack(cloud);
+        if (pending) {
+          await _upload();
+        } else {
+          _set(SyncStage.idle);
+        }
       } else {
         // Runtime pulls never replace a running timer or an open draw dialog.
         _conflict(cloud);
@@ -163,14 +186,23 @@ class ProgressSyncController extends ChangeNotifier {
       );
     } finally {
       _busy = false;
+      running.complete();
+      if (_rerun && !_disposed && !hasConflict) {
+        _rerun = false;
+        _debouncer?.cancel();
+        _debouncer = Timer(debounce, () => unawaited(syncNow()));
+      }
     }
   }
 
   Future<void> _upload() async {
     final raw = _raw;
     if (raw == null || _disposed) return;
+    final payload = CloudProgress.project(raw);
+    _sent = CloudProgress.canonical(payload);
+    await _writeMeta();
     final result = await remote
-        .save(CloudProgress.project(raw), expectedRevision: _revision)
+        .save(payload, expectedRevision: _revision)
         .timeout(timeout);
     if (_disposed) return;
     if (!result.saved) {
@@ -196,8 +228,13 @@ class ProgressSyncController extends ChangeNotifier {
   }
 
   Future<void> resolve({required bool useCloud}) async {
-    if (!hasConflict || _busy || _disposed) return;
+    // Wait for a running poll instead of silently dropping the choice.
+    while (_busy && !_disposed) {
+      await _running?.future;
+    }
+    if (!hasConflict || _disposed) return;
     _busy = true;
+    final running = _running = Completer<void>();
     final expected = conflict?.revision;
     _set(SyncStage.syncing);
     try {
@@ -237,6 +274,7 @@ class ProgressSyncController extends ChangeNotifier {
       _notify();
     } finally {
       _busy = false;
+      running.complete();
     }
   }
 

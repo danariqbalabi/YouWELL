@@ -19,7 +19,7 @@ class _ReductionDiaryState extends State<ReductionDiary> {
 
   List<String> get dates {
     final first = c.uatProgram!.firstDay;
-    return [for (var i = 0; i < 28; i++) dayKey(first.add(Duration(days: i)))]
+    return [for (var i = 0; i < 28; i++) shiftDayKey(dayKey(first), i)]
         .where(
           (day) =>
               day.compareTo(c.today) <= 0 &&

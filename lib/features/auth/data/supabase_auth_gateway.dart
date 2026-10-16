@@ -69,4 +69,10 @@ class SupabaseAuthGateway implements AuthGateway {
   Future<void> verifyMfa(String factorId, String code) async {
     await client.auth.mfa.challengeAndVerify(factorId: factorId, code: code);
   }
+
+  @override
+  Future<void> deleteAccount() async {
+    // The server derives the account from the JWT; no ID is sent.
+    await client.rpc('delete_youwell_account');
+  }
 }

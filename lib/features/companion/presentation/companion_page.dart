@@ -111,7 +111,7 @@ class _CompanionPageState extends State<CompanionPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    companionStageName(kind, stage),
+                    companionStageName(stage),
                     style: text.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
@@ -156,7 +156,7 @@ class _CompanionPageState extends State<CompanionPage> {
                                   : _show(
                                       _Preview(
                                         id: 'stage-$step',
-                                        label: companionStageName(kind, step),
+                                        label: companionStageName(step),
                                         unlockLevel:
                                             companionStageLevels[step - 1],
                                         stage: step,
@@ -319,7 +319,7 @@ class _StageStep extends StatelessWidget {
       button: onTap != null,
       selected: previewing,
       label:
-          '${companionStageName(kind, step)}, ${reached ? 'tercapai' : 'terbuka di level $unlockLevel'}',
+          '${companionStageName(step)}, ${reached ? 'tercapai' : 'terbuka di level $unlockLevel'}',
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
@@ -347,7 +347,7 @@ class _StageStep extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              companionStageName(kind, step),
+              companionStageName(step),
               textAlign: TextAlign.center,
               maxLines: 2,
               style: TextStyle(

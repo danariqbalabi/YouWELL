@@ -16,6 +16,8 @@ import 'package:youwell/features/progress/domain/level_curve.dart';
 import 'package:youwell/features/progress/domain/research_summary.dart';
 import 'package:youwell/features/reduction/domain/reduction_policy.dart';
 import 'package:youwell/features/companion/domain/companion_rewards.dart';
+import 'package:youwell/features/community/domain/community_store.dart'
+    show maxCommunityPostLength;
 
 part 'wellness_gamification.dart';
 part 'wellness_reduction.dart';
@@ -41,8 +43,7 @@ class WellnessController extends ChangeNotifier {
           _data['levelFloor'] = legacyLevelForXp(xp);
         }
       } catch (_) {
-        storageError =
-            'Preview lokal lama direset untuk memakai versi terbaru.';
+        storageError = 'Data lokal tidak bisa dibaca, jadi aplikasi mulai baru.';
       }
       _replaceRetiredDelayQuests();
       _reconcileActivityEvidence();
@@ -67,6 +68,11 @@ class WellnessController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     super.dispose();
+  }
+
+  void dismissStorageError() {
+    storageError = null;
+    if (!_disposed) notifyListeners();
   }
 
   String get themePreference => _data['themeMode']?.toString() ?? 'system';
@@ -116,10 +122,12 @@ class WellnessController extends ChangeNotifier {
       .map((row) => Map<String, dynamic>.from(row))
       .toList();
 
-  List<JsonMap> get quests => ((days[today]?['quests'] ?? const []) as List)
-      .whereType<Map>()
-      .map((task) => Map<String, dynamic>.from(task))
-      .toList();
+  List<JsonMap> get quests => _questsOn(today);
+  List<JsonMap> _questsOn(String day) =>
+      ((days[day]?['quests'] ?? const []) as List)
+          .whereType<Map>()
+          .map((task) => Map<String, dynamic>.from(task))
+          .toList();
   List<JsonMap> get dailyDrawCards =>
       ((days[today]?['cardPacks'] ?? days[today]?['bonusCards'] ?? const [])
               as List)
@@ -282,10 +290,16 @@ class WellnessController extends ChangeNotifier {
     for (final entry in ((_data['capacity'] ?? const {}) as Map).entries)
       entry.key.toString(): Map<String, dynamic>.from(entry.value as Map),
   };
-  Map<String, int> get ladderSteps => {
-    for (final entry in capacity.entries)
-      entry.key: (entry.value['step'] as num?)?.toInt() ?? 1,
-  };
+  /// Steps of the active path only: a category left behind by a path switch
+  /// keeps its saved step but is reported as unused (null) in research logs.
+  Map<String, int> get ladderSteps {
+    final active = ladderCategories(reduction: reduction);
+    return {
+      for (final entry in capacity.entries)
+        if (active.contains(entry.key))
+          entry.key: (entry.value['step'] as num?)?.toInt() ?? 1,
+    };
+  }
   List<String> get ladderOffers => uatProgramComplete
       ? []
       : [
@@ -624,8 +638,16 @@ class WellnessController extends ChangeNotifier {
         entry['reason'] =
             'Latihan disesuaikan dengan batas perjalanan 28 hari.';
       }
+      // A clock set forward and back must not freeze reviews for days.
+      if (_daysBetween(entry['reviewedOn'].toString(), today) < 0) {
+        entry['reviewedOn'] = today;
+      }
       final since = _daysBetween(entry['reviewedOn'].toString(), today);
-      if (since < 7 && !(inactive >= 5 && since >= 5)) continue;
+      // The early welcome-back happens once; further quiet weeks keep the
+      // regular 7-day cadence (CHALLENGE_SPEC §8).
+      final welcomeBack =
+          inactive >= 5 && since >= 5 && entry['change'] != 'rest';
+      if (since < 7 && !welcomeBack) continue;
       final current = ((entry['step'] as num?)?.toInt() ?? 1).clamp(1, maxStep);
       final review = reviewLadder(
         category: category,
@@ -661,7 +683,7 @@ class WellnessController extends ChangeNotifier {
     bool includePractice = false,
   }) {
     final end = before ?? today;
-    final start = dayKey(DateTime.parse(end).subtract(Duration(days: period)));
+    final start = shiftDayKey(end, -period);
     return [
       for (final entry in days.entries)
         if (entry.key.compareTo(start) >= 0 && entry.key.compareTo(end) < 0)
@@ -684,8 +706,7 @@ class WellnessController extends ChangeNotifier {
     return _daysBetween(before.last, today) - 1;
   }
 
-  int _daysBetween(String from, String to) =>
-      DateTime.parse(to).difference(DateTime.parse(from)).inDays;
+  int _daysBetween(String from, String to) => daysBetweenKeys(from, to);
 
   void acceptLadderStep(String category) {
     if (uatProgramComplete) return;
@@ -831,14 +852,44 @@ class WellnessController extends ChangeNotifier {
     _save();
   }
 
+  /// An unfinished walk/run (kind, banked seconds, start, meters, heartbeat)
+  /// kept on this device only, so closing the app does not lose the session.
+  JsonMap? get workoutDraft => _data['workoutDraft'] is Map
+      ? Map<String, dynamic>.from(_data['workoutDraft'])
+      : null;
+
+  void saveWorkoutDraft(JsonMap? draft) {
+    if (draft == null && _data['workoutDraft'] == null) return;
+    _data['workoutDraft'] = draft;
+    _save();
+  }
+
   /// Logs only meters and seconds, then checks walk/run quests against them.
+  /// [startedOn] is the day the session began: a walk that runs past
+  /// midnight counts for that day's card, not the new day's.
   WorkoutResult recordWorkout({
     required String kind,
     required int seconds,
     required int meters,
+    String? startedOn,
   }) {
-    if (uatProgramComplete) return const WorkoutResult();
+    final day =
+        startedOn != null &&
+            DateTime.tryParse(startedOn) != null &&
+            startedOn.compareTo(today) < 0
+        ? startedOn
+        : today;
+    final programEnded = day == today
+        ? uatProgramComplete
+        : profile == null ||
+              WellnessUatProgram(
+                started: profile?['started']?.toString() ?? day,
+                now: DateTime.parse(day),
+              ).complete;
+    if (programEnded) return const WorkoutResult();
     if (seconds < 1) return const WorkoutResult();
+    // Just after midnight the day may not exist until the next tick.
+    prepareToday();
     final kmPerHour = meters / seconds * 3.6;
     final tooFast = kmPerHour > maxWalkRunKmPerHour;
     _add('workoutSessions', {
@@ -846,11 +897,11 @@ class WellnessController extends ChangeNotifier {
       'seconds': seconds,
       'meters': meters,
       if (tooFast) 'countsForQuest': false,
-    });
+    }, day: day);
     if (tooFast) return const WorkoutResult(tooFast: true);
     final completed = <String>[], partial = <String>[];
-    final before = quests;
-    final tasks = quests;
+    final before = _questsOn(day);
+    final tasks = _questsOn(day);
     for (final (index, task) in tasks.indexed) {
       if (task['status'] == 'completed' &&
           task['validationInvalidated'] != true) {
@@ -864,7 +915,7 @@ class WellnessController extends ChangeNotifier {
       final ratio = ActivityEvidence.workoutProgress(
         task,
         workoutSessions,
-        today,
+        day,
       );
       if (ratio >= 1) {
         completed.add(task['title'].toString());
@@ -884,8 +935,8 @@ class WellnessController extends ChangeNotifier {
         };
       }
     }
-    _data['days'][today]['quests'] = tasks;
-    _rewardCompletions(before);
+    if (days[day] is Map) _data['days'][day]['quests'] = tasks;
+    _rewardCompletions(before, day: day);
     _save();
     return WorkoutResult(completed: completed, partial: partial);
   }
@@ -898,6 +949,7 @@ class WellnessController extends ChangeNotifier {
     if (uatProgramComplete) return;
     final hasPhotoEvidence = photoPath != null || photoCaptured;
     if (!hasPhotoEvidence && note.trim().isEmpty) return;
+    prepareToday();
     _add('mealCheckIns', {
       if (photoPath != null) 'photoPath': photoPath,
       if (hasPhotoEvidence) 'photoCaptured': true,
@@ -1027,6 +1079,14 @@ class WellnessController extends ChangeNotifier {
     _save();
   }
 
+  /// Sets or clears (null) this device's single reaction on a post.
+  void setCommunityReaction(String postId, String? reaction) {
+    final rows = _data['communityReactions'] as List;
+    rows.removeWhere((row) => row['postId'] == postId);
+    if (reaction != null) rows.add({'postId': postId, 'reaction': reaction});
+    _save();
+  }
+
   bool hasReportedCommunityPost(String postId) =>
       communityReports.any((report) => report['postId'] == postId);
 
@@ -1042,11 +1102,11 @@ class WellnessController extends ChangeNotifier {
     _save();
   }
 
-  void _add(String key, JsonMap value) {
+  void _add(String key, JsonMap value, {String? day}) {
     (_data[key] as List).add({
       ...value,
       'id': '${now.microsecondsSinceEpoch}-${Random().nextInt(9999)}',
-      'day': today,
+      'day': day ?? today,
       'time': now.toIso8601String(),
     });
     if (const {
@@ -1056,7 +1116,7 @@ class WellnessController extends ChangeNotifier {
       'workoutSessions',
       'mealCheckIns',
     }.contains(key)) {
-      _markActivity();
+      _markActivity(day);
       if (_mobileRewardsEnabled) {
         final badges = _claimAchievements();
         if (badges.isNotEmpty) {
@@ -1110,6 +1170,40 @@ class WellnessController extends ChangeNotifier {
     _data['researchParticipation'] = consent
         ? {'code': code, 'consentedOn': today}
         : null;
+    // A new consent (or code) starts its own delivery record.
+    _data.remove('researchSent');
+    _save();
+  }
+
+  bool researchWeekComplete(int week) =>
+      daysBetweenKeys(profile?['started']?.toString() ?? today, today) >=
+      7 * week;
+
+  /// Weeks to send: each started week once a day while it runs, and once more
+  /// when it is complete. Analysts keep the latest row per code and week.
+  List<int> get researchWeeksDue {
+    final program = uatProgram;
+    if (researchParticipation == null || program == null) return const [];
+    final sent = (_data['researchSent'] as Map?) ?? const {};
+    bool due(int week) {
+      final mark = sent['$week'];
+      if (mark is! Map) return true;
+      if (mark['complete'] == true) return false;
+      return mark['day'] != today || researchWeekComplete(week);
+    }
+
+    final last = program.complete ? 4 : program.week;
+    return [
+      for (var week = 1; week <= last; week++)
+        if (due(week)) week,
+    ];
+  }
+
+  void markResearchSent(int week, {required bool complete}) {
+    (_data['researchSent'] ??= <String, dynamic>{})['$week'] = {
+      'day': today,
+      'complete': complete,
+    };
     _save();
   }
 
@@ -1243,7 +1337,6 @@ class WellnessController extends ChangeNotifier {
   }
 }
 
-const maxCommunityPostLength = 280;
 const _photoFreeMealQuest = {
   'catalogId': 'fruit-veg',
   'title': 'Tambahkan buah atau sayur',

@@ -107,8 +107,12 @@ class ActivityPage extends StatelessWidget {
         _ActivityAction(
           icon: Icons.directions_run_rounded,
           color: c.body,
-          title: 'Jalan atau lari',
-          detail: timed
+          title: controller.workoutDraft != null
+              ? 'Lanjutkan sesi gerak'
+              : 'Jalan atau lari',
+          detail: controller.workoutDraft != null
+              ? 'Ada sesi yang belum disimpan. Ketuk untuk lanjut atau simpan.'
+              : timed
               ? 'Dihitung dari waktu. Boleh kunci layar.'
               : kIsWeb
               ? 'Misi GPS dari APK. Biarkan layar dan halaman ini terbuka.'

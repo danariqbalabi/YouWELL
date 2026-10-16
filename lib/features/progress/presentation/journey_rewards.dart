@@ -40,7 +40,7 @@ class JourneyRewards extends StatelessWidget {
         .where(
           (row) =>
               row['day'].toString().compareTo(
-                    dayKey(controller.now.subtract(const Duration(days: 6))),
+                    shiftDayKey(controller.today, -6),
                   ) >=
                   0 &&
               row['day'].toString().compareTo(controller.today) <= 0,
@@ -127,7 +127,7 @@ class JourneyRewards extends StatelessWidget {
                   crossAxisSpacing: 7,
                 ),
                 itemBuilder: (context, index) {
-                  final day = dayKey(start.add(Duration(days: index)));
+                  final day = shiftDayKey(dayKey(start), index);
                   final full = fullDays.contains(day),
                       done = doneDays.contains(day),
                       today = day == controller.today;

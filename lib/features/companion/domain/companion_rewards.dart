@@ -22,26 +22,14 @@ const companionStageLevels = [1, 3, 5, 7, 9];
 int companionStage(int level) =>
     companionStageLevels.lastIndexWhere((start) => level >= start) + 1;
 
-String companionStageName(String kind, int stage) {
-  final names = switch (kind) {
-    'cat' => [
-      'Anak kucing',
-      'Penjelajah',
-      'Teman ceria',
-      'Pemberani',
-      'Sahabat',
-    ],
-    'cloud' => [
-      'Awan kecil',
-      'Awan lembut',
-      'Awan ceria',
-      'Pelangi',
-      'Langit penuh',
-    ],
-    _ => ['Biji', 'Tunas', 'Daun', 'Berbunga', 'Pohon kecil'],
-  };
-  return names[(stage - 1).clamp(0, 4)];
-}
+/// YouWELL's one mascot. The stored `companion` value (plant/cat/cloud, kept
+/// for existing profiles and sync) now only picks Welli's colour.
+const companionName = 'Welli';
+const companionColors = {'plant': 'Daun', 'cat': 'Senja', 'cloud': 'Langit'};
+
+const _stageNames = ['Benih', 'Tunas', 'Berdaun', 'Mekar', 'Bersinar'];
+
+String companionStageName(int stage) => _stageNames[(stage - 1).clamp(0, 4)];
 
 class RewardMoment {
   const RewardMoment({

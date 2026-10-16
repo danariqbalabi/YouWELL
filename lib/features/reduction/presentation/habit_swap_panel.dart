@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:youwell/core/utils/date_key.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/features/reduction/domain/reduction_policy.dart';
@@ -107,10 +108,7 @@ class _HabitSwapPanelState extends State<HabitSwapPanel> {
       trigger: _trigger ?? '',
       history: c.habitSwaps.where((row) {
         final day = row['day']?.toString() ?? '';
-        final from = c.now
-            .subtract(const Duration(days: 6))
-            .toIso8601String()
-            .substring(0, 10);
+        final from = shiftDayKey(c.today, -6);
         return day.compareTo(from) >= 0 && day.compareTo(c.today) <= 0;
       }).toList(),
     );

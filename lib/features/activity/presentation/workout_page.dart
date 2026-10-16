@@ -11,7 +11,8 @@ import 'package:youwell/shared/widgets/game_widgets.dart';
 /// Walk/run log that keeps counting with the screen locked or the app in the
 /// background (Android foreground service, iOS background location). Only
 /// meters and seconds are kept; coordinates never enter the local snapshot.
-/// The session ends when the user finishes or leaves this page.
+/// An unfinished session is kept as a device-only draft until it is saved
+/// or discarded, so closing the app does not lose it.
 class WorkoutPage extends StatefulWidget {
   const WorkoutPage({super.key, required this.controller});
   final WellnessController controller;
@@ -30,6 +31,9 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   double _meters = 0;
   bool _starting = false;
   bool _gpsEnabled = false;
+  bool _openSettings = false;
+  DateTime? _resumeSince;
+  late String _sessionDay = widget.controller.today;
 
   /// Web app: the session counts time only, with no location at all.
   bool get _timed => widget.controller.workoutUsesTimer;
@@ -38,13 +42,68 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _restoreDraft();
+  }
+
+  /// A session the OS closed (app swiped away, iOS evicting the web app) is
+  /// restored. If it was running recently on the same day, the wall-clock
+  /// time keeps counting as it would have with the screen locked; otherwise
+  /// only the time up to the last saved heartbeat is kept, paused.
+  void _restoreDraft() {
+    final draft = widget.controller.workoutDraft;
+    if (draft == null) return;
+    if (draft['kind'] == 'run') _kind = 'run';
+    _meters = (draft['meters'] as num?)?.toDouble() ?? 0;
+    final banked = Duration(
+      seconds: (draft['bankedSeconds'] as num?)?.toInt() ?? 0,
+    );
+    final since = DateTime.tryParse(draft['since']?.toString() ?? '');
+    final heartbeat =
+        DateTime.tryParse(draft['heartbeat']?.toString() ?? '') ?? since;
+    final now = DateTime.now();
+    final day = draft['day']?.toString() ?? widget.controller.today;
+    _sessionDay = day;
+    if (since != null &&
+        heartbeat != null &&
+        day == widget.controller.today &&
+        !now.isBefore(since) &&
+        now.difference(heartbeat) <= _resumeWindow) {
+      _watch.restore(banked);
+      _resumeSince = since;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+    } else {
+      final counted = since == null || heartbeat == null
+          ? Duration.zero
+          : heartbeat.difference(since);
+      _watch.restore(banked + (counted.isNegative ? Duration.zero : counted));
+    }
+    _message =
+        'Sesi sebelumnya dipulihkan. Lanjutkan, atau tekan Selesai & simpan.';
+  }
+
+  void _saveDraft() {
+    if (_watch.elapsed.inSeconds < 1 && !_watch.isRunning) return;
+    widget.controller.saveWorkoutDraft({
+      'kind': _kind,
+      'day': _sessionDay,
+      'bankedSeconds': _watch.banked.inSeconds,
+      'since': _watch.since?.toIso8601String(),
+      'heartbeat': DateTime.now().toIso8601String(),
+      // Only the total distance: coordinates never enter the snapshot.
+      'meters': _meters.round(),
+    });
   }
 
   /// The session keeps running in the background; on return, refresh the
-  /// time and distance at once.
+  /// time and distance at once. Leaving the app saves a heartbeat first.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && mounted) setState(() {});
+    if (!mounted) return;
+    if (state == AppLifecycleState.resumed) {
+      setState(() {});
+    } else if (_watch.isRunning || _watch.elapsed.inSeconds > 0) {
+      _saveDraft();
+    }
   }
 
   @override
@@ -57,27 +116,38 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
 
   Future<void> _start() async {
     if (_watch.isRunning || _starting) return;
+    // A new session belongs to the day Mulai is pressed, even past midnight.
+    if (_watch.elapsed == Duration.zero && _resumeSince == null) {
+      _sessionDay = widget.controller.today;
+    }
     setState(() {
       _starting = true;
       _message = null;
     });
     var enabled = false;
+    var serviceOff = false, deniedForever = false;
     try {
       // Timed mode (web app) never asks for location.
-      if (!_timed && await Geolocator.isLocationServiceEnabled()) {
-        var permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
+      if (!_timed) {
+        serviceOff = !await Geolocator.isLocationServiceEnabled();
+        if (!serviceOff) {
+          var permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
+          deniedForever = permission == LocationPermission.deniedForever;
+          enabled =
+              permission == LocationPermission.always ||
+              permission == LocationPermission.whileInUse;
         }
-        enabled =
-            permission == LocationPermission.always ||
-            permission == LocationPermission.whileInUse;
       }
     } catch (_) {
       enabled = false;
     }
     if (!mounted) return;
     _gpsEnabled = enabled;
+    // The browser has no settings page to open; a phone does.
+    _openSettings = !kIsWeb && (serviceOff || deniedForever);
     _lastPosition = null;
     if (enabled) {
       _positions =
@@ -86,12 +156,14 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
           ).listen(
             (position) {
               if (!mounted || !_watch.isRunning) return;
+              // A coarse fix must not become the anchor either: the next good
+              // fix would add the whole error as distance.
+              if (position.accuracy > 40) return;
               final anchor = _lastPosition;
               if (anchor == null) {
                 _lastPosition = position;
                 return;
               }
-              if (position.accuracy > 40) return;
               final delta = Geolocator.distanceBetween(
                 anchor.latitude,
                 anchor.longitude,
@@ -122,16 +194,25 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
             },
           );
     }
-    _watch.start();
-    _ticker ??= Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+    _watch.start(_resumeSince);
+    _resumeSince = null;
+    _ticker ??= Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      setState(() {});
+      // A heartbeat every 15 s bounds what a killed app can lose.
+      if (_watch.isRunning && timer.tick % 15 == 0) _saveDraft();
     });
+    _saveDraft();
     setState(() {
       _starting = false;
       if (!enabled && !_timed) {
-        _message =
-            'Lokasi belum aktif. Misi jalan/lari dihitung dari jarak GPS, '
-            'jadi nyalakan lokasi dulu. Rute tidak disimpan.';
+        _message = deniedForever
+            ? 'Izin lokasi ditolak. Buka pengaturan untuk mengizinkan lokasi '
+                  'saat aplikasi dipakai. Rute tidak disimpan.'
+            : 'Lokasi belum aktif. Misi jalan/lari dihitung dari jarak GPS, '
+                  'jadi nyalakan lokasi dulu. Rute tidak disimpan.';
+      } else if (enabled) {
+        _message = null;
       }
     });
   }
@@ -141,12 +222,65 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     _positions?.cancel();
     _positions = null;
     _lastPosition = null;
+    _saveDraft();
     setState(() {});
+  }
+
+  Future<void> _openLocationSettings() async {
+    var opened = false;
+    try {
+      opened = await Geolocator.isLocationServiceEnabled()
+          ? await Geolocator.openAppSettings()
+          : await Geolocator.openLocationSettings();
+    } catch (_) {
+      opened = false;
+    }
+    if (!opened && mounted) {
+      setState(() => _message = 'Buka Pengaturan HP > Lokasi secara manual.');
+    }
+  }
+
+  /// Back while a session exists: save it, discard it, or keep going.
+  Future<void> _confirmLeave() async {
+    if (_watch.isRunning) _pause();
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Simpan sesi ini?'),
+        content: const Text(
+          'Sesi yang belum disimpan tidak dihitung untuk misi.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, 'discard'),
+            child: const Text('Buang'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Lanjutkan sesi'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, 'save'),
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (choice == 'save') {
+      _finish();
+    } else if (choice == 'discard') {
+      widget.controller.saveWorkoutDraft(null);
+      Navigator.of(context).pop();
+    }
   }
 
   void _finish() {
     _pause();
-    if (widget.controller.uatProgramComplete) {
+    // A walk begun on day 28 still counts after midnight on day 29.
+    if (widget.controller.uatProgramComplete &&
+        _sessionDay == widget.controller.today) {
+      widget.controller.saveWorkoutDraft(null);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -162,7 +296,9 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
       kind: _kind,
       seconds: _watch.elapsed.inSeconds,
       meters: _meters.round(),
+      startedOn: _sessionDay,
     );
+    widget.controller.saveWorkoutDraft(null);
     final message = result.tooFast
         ? 'Sesi tercatat, tapi kecepatan rata-rata di atas '
               '${maxWalkRunKmPerHour.round()} km/jam, jadi tidak dihitung '
@@ -244,9 +380,9 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
     final clock =
         '${elapsed.inMinutes.toString().padLeft(2, '0')}:${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}';
     return PopScope(
-      canPop: !_watch.isRunning,
+      canPop: !_starting && !_watch.isRunning && elapsed.inSeconds < 1,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _watch.isRunning) _pause();
+        if (!didPop && !_starting) _confirmLeave();
       },
       child: Scaffold(
         appBar: AppBar(title: const Text('Jalan & Lari')),
@@ -345,6 +481,17 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
               const SizedBox(height: 14),
               Text(_message!, style: TextStyle(color: context.colors.amber)),
             ],
+            if (_openSettings && !_gpsEnabled) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _openLocationSettings,
+                  icon: const Icon(Icons.settings_rounded),
+                  label: const Text('Buka pengaturan lokasi'),
+                ),
+              ),
+            ],
             const SizedBox(height: 22),
             FilledButton.icon(
               onPressed: _starting
@@ -421,16 +568,27 @@ class _WallStopwatch {
   DateTime? _since;
 
   bool get isRunning => _since != null;
+  Duration get banked => _banked;
+  DateTime? get since => _since;
 
   Duration get elapsed {
     final since = _since;
     return since == null ? _banked : _banked + DateTime.now().difference(since);
   }
 
-  void start() => _since ??= DateTime.now();
+  /// [from] resumes a restored running session at its original start.
+  void start([DateTime? from]) => _since ??= from ?? DateTime.now();
+
+  void restore(Duration banked) {
+    _banked = banked;
+    _since = null;
+  }
 
   void stop() {
     _banked = elapsed;
     _since = null;
   }
 }
+
+/// How long after its last heartbeat a closed running session still resumes.
+const _resumeWindow = Duration(hours: 3);

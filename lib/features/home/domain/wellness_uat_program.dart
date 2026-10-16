@@ -9,7 +9,7 @@ class WellnessUatProgram {
   static const durationDays = 28;
   static const stepLimits = {'Body': 4, 'Food': 5, 'Energy': 4, 'Lifestyle': 5};
   final DateTime firstDay, currentDay;
-  int get elapsedDays => currentDay.difference(firstDay).inDays;
+  int get elapsedDays => daysBetweenKeys(dayKey(firstDay), dayKey(currentDay));
   bool get complete => elapsedDays >= durationDays;
   int get dayNumber => (elapsedDays + 1).clamp(1, durationDays);
   int get week => ((dayNumber - 1) ~/ 7) + 1;

@@ -79,9 +79,10 @@ extension MobileWellnessRewards on WellnessController {
     return true;
   }
 
-  void _markActivity() {
+  void _markActivity([String? day]) {
     final rows = (_data['activityDays'] ??= <dynamic>[]) as List;
-    if (!rows.contains(today)) rows.add(today);
+    final key = day ?? today;
+    if (!rows.contains(key)) rows.add(key);
   }
 
   List<String> _claimAchievements() {
@@ -111,14 +112,21 @@ extension MobileWellnessRewards on WellnessController {
     return earned;
   }
 
-  void _rewardCompletions(List<JsonMap> before) {
+  /// [day] defaults to today; a walk finished after midnight rewards the day
+  /// it started on, including that day's one-time full-day bonus.
+  void _rewardCompletions(List<JsonMap> before, {String? day}) {
     if (!_mobileRewardsEnabled) return;
+    final key = day ?? today;
+    final dayQuests = _questsOn(key);
     final previousDone = before
         .where((row) => row['status'] == 'completed')
         .map((row) => row['id'])
         .toSet();
-    final newDone = completedCards
-        .where((row) => !previousDone.contains(row['id']))
+    final newDone = dayQuests
+        .where(
+          (row) =>
+              row['status'] == 'completed' && !previousDone.contains(row['id']),
+        )
         .toList();
     if (newDone.isEmpty) return;
     final rewards = (_data['mobileRewards'] ??= <String, dynamic>{}) as Map;
@@ -127,16 +135,17 @@ extension MobileWellnessRewards on WellnessController {
       final id = 'quest:${task['id']}';
       if (rewards.containsKey(id)) continue;
       final amount = (task['xp'] as num?)?.toInt() ?? 15;
-      rewards[id] = {'day': today, 'questXp': amount};
+      rewards[id] = {'day': key, 'questXp': amount};
       gained += amount;
     }
     if (gained == 0) return;
     final oldLevel = max(levelFloor, levelForXp(xp - gained));
     var full = false;
-    if (coreQuests.length >= 3 &&
-        coreQuests.every((task) => task['status'] == 'completed') &&
-        !rewards.containsKey('day:$today')) {
-      rewards['day:$today'] = {'day': today, 'bonusXp': 20};
+    final core = dayQuests.where((task) => task['bonus'] != true).toList();
+    if (core.length >= 3 &&
+        core.every((task) => task['status'] == 'completed') &&
+        !rewards.containsKey('day:$key')) {
+      rewards['day:$key'] = {'day': key, 'bonusXp': 20};
       gained += 20;
       full = true;
     }

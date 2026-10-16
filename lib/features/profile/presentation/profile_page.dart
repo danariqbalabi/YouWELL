@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:youwell/application/app_auth_controller.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/platform/platform.dart' as platform;
 import 'package:youwell/core/theme/app_colors.dart';
@@ -14,13 +15,8 @@ import 'package:youwell/features/auth/presentation/account_scope.dart';
 import 'package:youwell/features/sync/presentation/progress_sync_panel.dart';
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({
-    super.key,
-    required this.controller,
-    this.mobileExperience = false,
-  });
+  const ProfilePage({super.key, required this.controller});
   final WellnessController controller;
-  final bool mobileExperience;
 
   Future<void> _researchConsent(BuildContext context) async {
     String? code = controller.researchParticipation?['code']?.toString();
@@ -34,8 +30,9 @@ class ProfilePage extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Ringkasan berisi jumlah hari dibuka, aktivitas, quest, tingkat tangga, dan Habit Swap. Tidak menyertakan alias, teks pribadi, foto, atau lokasi. Belum dikirim otomatis; ekspor dan bagikan hanya jika kamu setuju.',
+                Text(
+                  'Ringkasan berisi jumlah hari dibuka, aktivitas, quest, tingkat tangga, dan Habit Swap. Tidak menyertakan alias, teks pribadi, foto, atau lokasi. '
+                  '${AccountScope.maybeOf(context)?.researchStore != null ? 'Setelah kamu setuju, ringkasan angka dan kodemu dikirim otomatis ke tim peneliti saat online, sampai minggu ke-4.' : 'Ekspor dan bagikan hanya jika kamu setuju.'}',
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
@@ -68,6 +65,7 @@ class ProfilePage extends StatelessWidget {
                   ? () {
                       controller.setResearchParticipation(code, consent: true);
                       Navigator.pop(dialogContext);
+                      AccountScope.maybeOf(context)?.submitResearch();
                     }
                   : null,
               child: const Text('Simpan persetujuan'),
@@ -84,11 +82,12 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (controller.profile == null) return const SizedBox.shrink();
-    return mobileExperience ? _mobileBuild(context) : _webBuild(context);
+    return _mobileBuild(context);
   }
 
   Future<void> _confirmReset(BuildContext context) async {
-    final syncing = AccountScope.maybeOf(context)?.progress != null;
+    final account = AccountScope.maybeOf(context);
+    final syncing = account?.progress != null;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -118,14 +117,83 @@ class ProfilePage extends StatelessWidget {
       ),
     );
     if (confirmed == true) {
-      // Photos belonging to other cached accounts must survive this reset.
-      for (final meal in controller.mealCheckIns) {
-        if (meal['photoPath'] case final String path) {
+      await _deletePhotos();
+      await controller.reset();
+      await account?.clearRecoveryCopies();
+      if (context.mounted) Navigator.pop(context);
+    }
+  }
+
+  /// Photos of this account only: other cached accounts keep theirs, and a
+  /// path outside the Meal Snap folder is never touched.
+  Future<void> _deletePhotos() async {
+    for (final meal in controller.mealCheckIns) {
+      if (meal['photoPath'] case final String path) {
+        try {
           await MealPhotoStore.delete(path);
+        } catch (_) {
+          // One unreadable photo must not block deleting the rest.
         }
       }
-      await controller.reset();
-      if (context.mounted) Navigator.pop(context);
+    }
+  }
+
+  Future<void> _confirmDeleteAccount(
+    BuildContext context,
+    AppAuthController account,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hapus akun YouWELL?'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'Profil, progres, post, reaksi, dan laporanmu di server dihapus '
+            'permanen. Data dan foto akun ini di perangkat juga dihapus. Akun '
+            'Google-mu sendiri tidak terpengaruh.\n\nRingkasan penelitian '
+            'berkode yang sudah terkirim tidak terhubung ke akunmu dan dihapus '
+            'tim setelah analisis.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xffd92d20),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Hapus akun'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    );
+    try {
+      // On success the signed-out screen replaces this whole app.
+      await account.deleteAccount(deleteLocalFiles: _deletePhotos);
+    } catch (_) {
+      navigator.pop();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Akun belum terhapus. Periksa koneksi lalu coba lagi; tidak ada data yang dihapus.',
+          ),
+        ),
+      );
     }
   }
 
@@ -181,7 +249,7 @@ class ProfilePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Tidak menarik salinan yang sudah kamu bagikan ke peneliti.',
+                    'Tidak menarik ringkasan yang sudah terkirim atau kamu bagikan ke peneliti.',
                     style: TextStyle(
                       color: sheetContext.colors.muted,
                       fontSize: 12.5,
@@ -288,10 +356,10 @@ class ProfilePage extends StatelessWidget {
                 SwitchListTile(
                   secondary: const Icon(Icons.directions_walk_rounded),
                   title: const Text(
-                    'Aktivitas ringan (low-impact)',
+                    'Aktivitas ringan',
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
-                  subtitle: const Text('Quest lari tidak akan muncul.'),
+                  subtitle: const Text('Tanpa quest lari.'),
                   value: profile['lowImpact'] == true,
                   onChanged: controller.setLowImpact,
                 ),
@@ -346,6 +414,17 @@ class ProfilePage extends StatelessWidget {
               const SizedBox(height: 16),
               ProgressSyncPanel(auth: account),
               const SizedBox(height: 16),
+              _Group(
+                children: [
+                  _Row(
+                    icon: Icons.person_remove_outlined,
+                    label: 'Hapus akun',
+                    danger: true,
+                    onTap: () => _confirmDeleteAccount(context, account),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: () async {
                   final confirmed = await showDialog<bool>(
@@ -386,261 +465,6 @@ class ProfilePage extends StatelessWidget {
       ),
     );
   }
-
-  Widget _webBuild(BuildContext context) {
-    final appearance = AppearanceScope.of(context);
-    final profile = controller.profile!;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Profil & Pengaturan')),
-      body: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) => ListView(
-          padding: const EdgeInsets.fromLTRB(22, 12, 22, 36),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: context.colors.surface,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: context.colors.border),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: context.colors.selected,
-                    child: Text(
-                      profile['alias'].toString()[0].toUpperCase(),
-                      style: TextStyle(
-                        color: context.colors.accent,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          profile['alias'].toString(),
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          'Level ${controller.level}  •  ${controller.xp} XP',
-                          style: TextStyle(color: context.colors.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            _Section(
-              title: 'Tampilan',
-              children: [
-                Text(
-                  'Pilih tema atau ikuti pengaturan perangkat.',
-                  style: TextStyle(color: context.colors.muted),
-                ),
-                const SizedBox(height: 14),
-                SegmentedButton<String>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: 'system', label: Text('Sistem')),
-                    ButtonSegment(value: 'light', label: Text('Terang')),
-                    ButtonSegment(value: 'dark', label: Text('Gelap')),
-                  ],
-                  selected: {appearance.themePreference},
-                  onSelectionChanged: (selection) =>
-                      appearance.setThemePreference(selection.first),
-                ),
-              ],
-            ),
-            if (mobileExperience)
-              _Section(
-                title: 'Animasi & getaran',
-                children: [
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Kurangi animasi'),
-                    subtitle: const Text(
-                      'Reward tetap terlihat tanpa gerakan.',
-                    ),
-                    value: controller.reduceMotion,
-                    onChanged: controller.setReduceMotion,
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Getaran ringan'),
-                    value: controller.haptics,
-                    onChanged: controller.setHaptics,
-                  ),
-                ],
-              ),
-            _Section(
-              title: 'Preferensi',
-              children: [
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    'Jalur ${controller.reductionLabel.toLowerCase()}',
-                  ),
-                  subtitle: Text(
-                    controller.reduction
-                        ? 'Aktif. Habit Swap tersedia di Hari ini.'
-                        : 'Tampilkan Habit Swap di Hari ini dan tambahkan misinya ke kartu harian.',
-                  ),
-                  value: controller.reduction,
-                  onChanged: (value) => _switchPath(context, value),
-                ),
-                if (controller.reduction) ...[
-                  FilledButton.icon(
-                    onPressed: () => openReductionSupport(context, controller),
-                    icon: const Icon(Icons.smoke_free_rounded),
-                    label: const Text('Buka Habit Swap'),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Mode aktivitas ringan (low-impact)'),
-                  subtitle: const Text('Quest lari tidak akan muncul.'),
-                  value: profile['lowImpact'] == true,
-                  onChanged: controller.setLowImpact,
-                ),
-              ],
-            ),
-            if (mobileExperience)
-              _Section(
-                title: 'UAT opsional',
-                children: [
-                  Text(
-                    controller.researchParticipation == null
-                        ? 'Tetap bisa memakai aplikasi tanpa ikut penelitian.'
-                        : 'Kode ${controller.researchParticipation!['code']} · hanya ringkasan angka',
-                    style: TextStyle(color: context.colors.muted),
-                  ),
-                  TextButton(
-                    onPressed: () => _researchConsent(context),
-                    child: const Text('Atur persetujuan & kode'),
-                  ),
-                  if (controller.researchParticipation != null) ...[
-                    OutlinedButton.icon(
-                      onPressed: () => platform.download(
-                        'youwell-uat-summary.json',
-                        utf8.encode(controller.exportResearchSummary()),
-                        'application/json',
-                      ),
-                      icon: const Icon(Icons.download_outlined),
-                      label: const Text('Ekspor ringkasan UAT'),
-                    ),
-                    TextButton(
-                      onPressed: () => controller.setResearchParticipation(
-                        null,
-                        consent: false,
-                      ),
-                      child: const Text('Tarik persetujuan lokal'),
-                    ),
-                    Text(
-                      'Tidak menarik salinan yang sudah kamu bagikan ke peneliti.',
-                      style: TextStyle(
-                        color: context.colors.muted,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            _Section(
-              title: 'Data lokal',
-              children: [
-                Text(
-                  'Belum ada akun atau cloud sync. Data hanya tersimpan di perangkat ini.',
-                  style: TextStyle(color: context.colors.muted, height: 1.5),
-                ),
-                const SizedBox(height: 14),
-                OutlinedButton.icon(
-                  onPressed: () => platform.download(
-                    'youwell-${controller.today}.json',
-                    utf8.encode(controller.export()),
-                    'application/json',
-                  ),
-                  icon: const Icon(Icons.download_outlined),
-                  label: const Text('Ekspor data'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (dialogContext) => AlertDialog(
-                        title: const Text('Mulai ulang?'),
-                        content: const Text(
-                          'Profil dan seluruh progress lokal akan dihapus.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () =>
-                                Navigator.pop(dialogContext, false),
-                            child: const Text('Batal'),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.pop(dialogContext, true),
-                            child: const Text('Hapus'),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirmed == true) {
-                      await MealPhotoStore.clear();
-                      await controller.reset();
-                      if (context.mounted) Navigator.pop(context);
-                    }
-                  },
-                  child: const Text('Hapus data & mulai ulang'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.children});
-  final String title;
-  final List<Widget> children;
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: context.colors.surface,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: context.colors.border),
-    ),
-    child: Material(
-      type: MaterialType.transparency,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 10),
-          ...children,
-        ],
-      ),
-    ),
-  );
 }
 
 class _Heading extends StatelessWidget {

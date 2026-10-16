@@ -192,7 +192,7 @@ class ReductionEntryCard extends StatelessWidget {
           Text(
             controller.uatProgramComplete
                 ? 'Perjalanan 28 hari selesai. Lihat kembali catatan dan rekapmu.'
-                : 'Catat pemicu, aktivitas pengganti, dan hasilnya. Total konsumsi dicatat terpisah.',
+                : 'Saat ingin merokok/vape, catat pemicunya dan coba satu pengganti.',
             style: TextStyle(color: c.muted),
           ),
           const SizedBox(height: 12),

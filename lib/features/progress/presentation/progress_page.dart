@@ -18,7 +18,6 @@ class ProgressPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
-    final kind = controller.profile?['companion']?.toString() ?? 'plant';
     final level = controller.level;
 
     final badges = visibleBadges(controller).toList();
@@ -53,7 +52,7 @@ class ProgressPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          companionStageName(kind, companionStage(level)),
+                          companionStageName(companionStage(level)),
                           style: text.titleLarge,
                         ),
                         Text(
@@ -182,7 +181,7 @@ class ProgressPage extends StatelessWidget {
   }
 
   int _habitSwapsThisWeek() {
-    final from = dayKey(controller.now.subtract(const Duration(days: 6)));
+    final from = shiftDayKey(controller.today, -6);
     return controller.habitSwaps.where((row) {
       final day = row['day'].toString();
       return day.compareTo(from) >= 0 && day.compareTo(controller.today) <= 0;

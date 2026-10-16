@@ -393,7 +393,7 @@ class WeekStrip extends StatelessWidget {
         for (var back = 6; back >= 0; back--)
           Builder(
             builder: (context) {
-              final date = now.subtract(Duration(days: back));
+              final date = DateTime(now.year, now.month, now.day - back);
               final key = dayKey(date);
               final active = activeDays.contains(key);
               final isToday = key == today;

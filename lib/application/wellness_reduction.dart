@@ -124,7 +124,7 @@ extension ReductionSupport on WellnessController {
         activeProducts.isEmpty ||
         day.compareTo(start) < 0 ||
         day.compareTo(today) > 0 ||
-        parsed.difference(DateTime.parse(start)).inDays >= 28 ||
+        daysBetweenKeys(start, day) >= 28 ||
         (uatProgramComplete && nicotineDay(day) == null)) {
       return false;
     }

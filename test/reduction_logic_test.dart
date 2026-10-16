@@ -338,6 +338,19 @@ void main() {
         ).first,
         'walk',
       );
+      // One skip among two reports is not yet a pattern.
+      expect(
+        suggestedSwaps(
+          lowImpact: false,
+          product: 'vape',
+          trigger: 'screen',
+          history: [
+            {...reports.first, 'outcome': 'used'},
+            reports.last,
+          ],
+        ).first,
+        'walk',
+      );
     },
   );
 

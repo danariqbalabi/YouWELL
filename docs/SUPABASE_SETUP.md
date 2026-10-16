@@ -7,11 +7,13 @@ logout, dan pesan error/coba lagi. Android memakai browser eksternal lalu
 callback kembali ke APK. Web kembali ke origin build yang sedang dibuka.
 
 **Sinkron progres tahap 2 tersedia setelah migration kedua**; lihat
-`PROGRESS_SYNC.md`. Pengiriman UAT, community multi-user, dan hapus akun server
-belum terhubung. Cache dipisahkan per project, surface, dan UID Supabase.
+`PROGRESS_SYNC.md`. Cache dipisahkan per project, surface, dan UID Supabase.
 Migration tahap 1 menyiapkan alias privat dan otorisasi admin; tahap 2 menulis
-alias secara atomik dengan progres. Moderasi tetap demo lokal, meskipun pintu
-masuk admin sekarang bisa dilindungi autentikasi + MFA.
+alias secara atomik dengan progres. **Tahap 3** menghubungkan Community
+multi-user + moderasi admin (MFA), pengiriman `research_logs` mingguan untuk
+peserta UAT yang setuju, dan Hapus akun di server. Tanpa migration tahap 3,
+Community menampilkan pesan belum terhubung dan Hapus akun gagal tanpa
+menghapus data apa pun.
 
 ## 1. Konfigurasi project
 
@@ -52,6 +54,14 @@ benar**, buat query baru, tempel seluruh isi:
 Lalu Run. Migration transaksional ini tidak menghapus pengguna/data lama.
 Untuk sinkron profil/progres, jalankan berikutnya
 `supabase/migrations/20261016120000_create_progress_sync.sql`.
+Terakhir jalankan
+`supabase/migrations/20261016150000_create_community_research_account_deletion.sql`
+untuk Community, `research_logs`, Hapus akun, dan filter privasi progres yang
+menolak data mentah rokok/vape. Tabel tahap 3 hanya bisa diakses lewat RPC;
+tidak ada izin tabel langsung untuk `anon`/`authenticated`.
+Tahap 4 (`20261016170000_research_export_for_admins.sql`) menambah tombol
+**Unduh ringkasan penelitian (CSV)** di web admin: hanya admin ber-MFA, berisi
+baris terbaru per kode dan minggu.
 Schema `private` tidak boleh ditambahkan ke daftar exposed schemas.
 
 Tabel `public.youwell_profiles` memakai RLS pemilik (`auth.uid() = user_id`)
@@ -68,7 +78,17 @@ where oid = 'public.youwell_profiles'::regclass; -- true
 select has_table_privilege('anon', 'public.youwell_profiles', 'SELECT'); -- false
 select has_schema_privilege('authenticated', 'private', 'USAGE'); -- false
 select has_function_privilege('anon', 'public.youwell_admin_access()', 'EXECUTE'); -- false
+select has_table_privilege('authenticated', 'public.youwell_posts', 'SELECT'); -- false
+select has_table_privilege('authenticated', 'public.youwell_research_logs', 'SELECT'); -- false
+select has_function_privilege('anon', 'public.delete_youwell_account()', 'EXECUTE'); -- false
 ```
+
+Data penelitian: baca `public.youwell_research_logs` dari dashboard (satu
+anggota tim). Tabel ini tanpa `user_id`/email/alias. Satu minggu bisa terkirim
+berkali-kali selama minggu itu berjalan (agar keaktifan minggu ke-4 tercatat
+walau peserta tidak membuka aplikasi lagi setelahnya); pakai baris
+`submitted_at` terbaru per `(participant_code, week)`, atau baris
+`week_complete = true` bila ada.
 
 ## 3. Konfigurasi Flutter
 
@@ -115,9 +135,15 @@ menimpa cache akun yang sudah ada, tidak menghapus salinan lama, dan hanya
 bisa diklaim satu akun/project. Dengan migration tahap 2, progres tersinkron
 otomatis; file foto/catatan pribadi tidak ikut. Konflik meminta pilihan.
 
+Pilihan "mulai baru" juga dicatat sebagai keputusan akun itu, sehingga akun
+lain di perangkat yang sama tidak pernah ditawari progres tamu orang lain.
+
 Logout langsung menyembunyikan navigator/data akun, mempertahankan cache
 akun dan foto. Reset dari Profil meminta konfirmasi bahwa progres akan direset
-di perangkat **dan cloud**, bukan akun Supabase. Foto akun lain tidak dihapus.
+di perangkat **dan cloud**, bukan akun Supabase, dan menghapus salinan
+pemulihan lokal. Foto akun lain tidak dihapus. **Hapus akun** (Profil) memanggil
+server lebih dulu; baru setelah server berhasil, semua cache akun ini, salinan
+pemulihan, progres tamu yang diklaimnya, dan fotonya dihapus dari perangkat.
 Cache lokal adalah isolasi aplikasi, bukan enkripsi/pengaman terhadap orang
 yang memiliki akses penuh ke perangkat atau developer tools.
 
@@ -136,9 +162,14 @@ Admin login Google, lalu menambahkan kunci setup TOTP ke authenticator dan
 memasukkan kode 6 digit. Kunci TOTP hanya ditampilkan saat setup; jangan
 bagikan, screenshot, log, atau commit. Bukan kode SMS/Google OTP.
 Server memeriksa akun Google terhubung, email terkonfirmasi, allowlist, dan
-JWT `aal2` sebelum UI moderasi. Hapus baris allowlist untuk mencabut akses;
-akses diperiksa kembali saat masuk/refresh sesi. Phase 2 wajib menerapkan
-cek yang sama dalam policy setiap operasi moderasi server, bukan hanya UI.
+JWT `aal2` sebelum UI moderasi, dan setiap RPC moderasi tahap 3 memeriksa hal
+yang sama di server. Hapus baris allowlist untuk mencabut akses; akses
+diperiksa ulang diam-diam saat sesi di-refresh.
+
+**Penting:** TOTP didaftarkan oleh siapa pun yang pertama kali login dengan
+akun allowlist yang belum punya faktor. Daftarkan TOTP setiap admin sendiri
+segera setelah menambahkan emailnya, sebelum orang lain sempat memakai sesi
+Google akun itu.
 
 ## 6. Render
 
@@ -157,6 +188,9 @@ Pengaturan provider/SQL/Render belum dilakukan otomatis oleh kode.
 5. Callback Android kembali ke APK setelah full rebuild; web kembali ke origin benar.
 6. Admin non-whitelist ditolak; whitelist tanpa MFA tidak masuk; TOTP benar diizinkan.
 7. Uji RLS dengan dua akun setelah migration; client B tidak dapat membaca/mengubah alias A.
+8. Post akun A hanya tampil di B setelah admin menyetujui; reaksi B menambah hitungan; laporan B muncul di admin.
+9. Peserta dengan kode P1–P10 dan persetujuan menghasilkan baris `youwell_research_logs` tanpa alias/email.
+10. Hapus akun saat offline gagal tanpa menghapus apa pun; saat online menghapus user di Authentication dan semua barisnya.
 
 Tes otomatis tidak membuktikan Google OAuth callback, RLS pada project remote,
 atau TOTP nyata telah berhasil. Perlu akun uji dan SQL pada project target.

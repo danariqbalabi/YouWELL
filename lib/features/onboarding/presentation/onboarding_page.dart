@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/core/theme/appearance_scope.dart';
+import 'package:youwell/features/companion/domain/companion_rewards.dart';
 import 'package:youwell/features/companion/presentation/mobile_companion.dart';
 import 'package:youwell/shared/widgets/game_widgets.dart';
 import 'package:youwell/features/reduction/domain/reduction_policy.dart';
@@ -27,7 +28,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final _alias = TextEditingController();
 
   static const _lastStep = 3;
-  static const _names = {'plant': 'Mori', 'cat': 'Milo', 'cloud': 'Awan'};
 
   /// 18–22 spans the PP 28/2024 age-21 line, so it gets quit framing too.
   bool get _quitFraming => _ageGroup == 'under18' || _ageGroup == '18-22';
@@ -75,19 +75,26 @@ class _OnboardingPageState extends State<OnboardingPage> {
         'ageGroup': _ageGroup,
         if (_path == 'reduction') 'nicotineProduct': _nicotineProduct,
       });
+    } on ArgumentError {
+      if (mounted) {
+        setState(
+          () => _error = 'Alias 3–20 karakter, diawali huruf (huruf/angka/_).',
+        );
+      }
     } catch (_) {
-      setState(
-        () => _error = 'Alias 3–20 karakter, diawali huruf (huruf/angka/_).',
-      );
+      if (mounted) {
+        setState(
+          () => _error = 'Profil belum tersimpan di perangkat. Coba lagi.',
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final name = _names[_companion]!;
     final (question, helper) = switch (_step) {
-      0 => ('Hai! Aku $name, teman tumbuhmu. Umurmu berapa?', ''),
+      0 => ('Hai! Aku $companionName, teman tumbuhmu. Umurmu berapa?', ''),
       1 => (
         'Oke! Kamu mau fokus ke mana dulu?',
         'Bisa diganti kapan saja di Profil.',
@@ -97,7 +104,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         'Tenang, misinya naik pelan-pelan ketika kamu siap.',
       ),
       _ => (
-        'Terakhir! Pilih temanmu, lalu kasih tahu mau dipanggil apa.',
+        'Terakhir! Pilih warna $companionName, lalu kasih tahu mau dipanggil apa.',
         'Alias ini yang tampil di Community, bukan nama asli.',
       ),
     };
@@ -292,7 +299,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             Expanded(
               child: _CompanionChoice(
                 kind: kind,
-                name: _names[kind]!,
+                name: companionColors[kind]!,
                 selected: _companion == kind,
                 onTap: () => _pick(() => _companion = kind),
               ),
@@ -442,7 +449,7 @@ class _CompanionChoice extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: 'Pilih $name',
+      label: 'Pilih warna $name',
       child: GameCard(
         onTap: onTap,
         color: selected ? c.selected : c.card,

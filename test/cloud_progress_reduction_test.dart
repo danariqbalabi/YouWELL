@@ -48,9 +48,24 @@ void main() {
     ]) {
       expect(payload.containsKey(key), isFalse);
     }
+    // Per-day counts only: moment times would form a craving-time log.
     for (final row in payload['habitSwaps'] as List) {
-      expect((row as Map).keys.toSet(), {'id', 'day', 'time'});
+      expect((row as Map).keys.toSet(), {'id', 'day'});
     }
+  });
+
+  test('Reduction keys are stripped even if they leak into shared maps', () {
+    final state = reductionState();
+    state['days'] = {
+      '2026-10-16': {
+        'quests': [
+          {'id': 'q1', 'status': 'completed', 'product': 'vape', 'xp': 20},
+        ],
+      },
+    };
+    final payload = CloudProgress.project(jsonEncode(state));
+    final quest = (payload['days']['2026-10-16']['quests'] as List).single;
+    expect(quest, {'id': 'q1', 'status': 'completed', 'xp': 20});
   });
 
   test(

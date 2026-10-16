@@ -73,9 +73,8 @@ class ConsumptionWeek {
     required String through,
   }) {
     RangeError.checkValueInInterval(week, 1, 4, 'week');
-    final first = DateTime.parse(started).add(Duration(days: (week - 1) * 7));
-    final from = dayKey(first),
-        until = dayKey(first.add(const Duration(days: 7)));
+    final from = shiftDayKey(started, (week - 1) * 7),
+        until = shiftDayKey(from, 7);
     final unique = <String, JsonMap>{};
     for (final row in logs) {
       final day = row['day']?.toString() ?? '';
@@ -118,7 +117,8 @@ class ConsumptionWeek {
 }
 
 /// Explainable suggestions: movement first, seated movement for low-impact;
-/// a tried strategy may lead after >=2 matched reports with a skipped moment.
+/// a tried strategy may lead after two matched reports that skipped the moment
+/// (REDUCTION_UAT: "dua laporan cocok ... dengan hasil melewatkan").
 List<String> suggestedSwaps({
   required bool lowImpact,
   required String product,
@@ -136,9 +136,8 @@ List<String> suggestedSwaps({
           row['activity'] == activity &&
           isSwapAttempt(row),
     );
-    if (matches.length < 2) return -1;
     final skipped = matches.where((row) => row['outcome'] == 'skipped').length;
-    return skipped == 0 ? -1 : skipped / matches.length;
+    return skipped < 2 ? -1 : skipped / matches.length;
   }
 
   return [...order]..sort((a, b) {
