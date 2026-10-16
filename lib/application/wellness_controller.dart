@@ -379,6 +379,37 @@ class WellnessController extends ChangeNotifier {
     await _save();
   }
 
+  /// Community and sync show the alias; it follows the onboarding rule.
+  void setAlias(String value) {
+    final alias = value.trim();
+    if (profile == null) return;
+    if (!RegExp(r'^[a-zA-Z][a-zA-Z0-9_]{2,19}$').hasMatch(alias)) {
+      throw ArgumentError('Alias 3–20 karakter: huruf, angka, underscore.');
+    }
+    _data['profile']['alias'] = alias;
+    _save();
+  }
+
+  /// The companion's own name, or Welli until the user picks one.
+  String get companionDisplayName {
+    final name = profile?['companionName']?.toString().trim() ?? '';
+    return name.isEmpty ? companionName : name;
+  }
+
+  /// 1–20 characters without control characters (the server's rule too).
+  bool setCompanionName(String value) {
+    final name = value.trim();
+    if (profile == null ||
+        name.isEmpty ||
+        name.length > 20 ||
+        RegExp(r'[\x00-\x1F\x7F]').hasMatch(name)) {
+      return false;
+    }
+    _data['profile']['companionName'] = name;
+    _save();
+    return true;
+  }
+
   void prepareToday() {
     if (profile == null) return;
     final opened = (_data['openedDays'] ??= <dynamic>[]) as List;
@@ -1097,6 +1128,26 @@ class WellnessController extends ChangeNotifier {
     return true;
   }
 
+  /// Own posts only; seed examples and other aliases stay.
+  void deleteCommunityPost(String id) {
+    final posts = _data['communityPosts'] as List;
+    final count = posts.length;
+    posts.removeWhere(
+      (post) =>
+          post['id'] == id &&
+          post['sample'] != true &&
+          post['alias'] == profile?['alias'],
+    );
+    if (posts.length == count) return;
+    (_data['communityReactions'] as List).removeWhere(
+      (row) => row['postId'] == id,
+    );
+    (_data['communityReports'] as List).removeWhere(
+      (row) => row['postId'] == id,
+    );
+    _save();
+  }
+
   void resolveCommunityReport(String id) {
     (_data['communityReports'] as List).removeWhere((row) => row['id'] == id);
     _save();
@@ -1156,68 +1207,6 @@ class WellnessController extends ChangeNotifier {
       if (row is Map) row.remove('photoPath');
     }
     return const JsonEncoder.withIndent('  ').convert(copy);
-  }
-
-  JsonMap? get researchParticipation => _data['researchParticipation'] is Map
-      ? Map<String, dynamic>.from(_data['researchParticipation'])
-      : null;
-
-  void setResearchParticipation(String? code, {required bool consent}) {
-    if (consent &&
-        (code == null || !RegExp(r'^P(?:[1-9]|10)$').hasMatch(code))) {
-      throw ArgumentError('Pilih kode P1–P10.');
-    }
-    _data['researchParticipation'] = consent
-        ? {'code': code, 'consentedOn': today}
-        : null;
-    // A new consent (or code) starts its own delivery record.
-    _data.remove('researchSent');
-    _save();
-  }
-
-  bool researchWeekComplete(int week) =>
-      daysBetweenKeys(profile?['started']?.toString() ?? today, today) >=
-      7 * week;
-
-  /// Weeks to send: each started week once a day while it runs, and once more
-  /// when it is complete. Analysts keep the latest row per code and week.
-  List<int> get researchWeeksDue {
-    final program = uatProgram;
-    if (researchParticipation == null || program == null) return const [];
-    final sent = (_data['researchSent'] as Map?) ?? const {};
-    bool due(int week) {
-      final mark = sent['$week'];
-      if (mark is! Map) return true;
-      if (mark['complete'] == true) return false;
-      return mark['day'] != today || researchWeekComplete(week);
-    }
-
-    final last = program.complete ? 4 : program.week;
-    return [
-      for (var week = 1; week <= last; week++)
-        if (due(week)) week,
-    ];
-  }
-
-  void markResearchSent(int week, {required bool complete}) {
-    (_data['researchSent'] ??= <String, dynamic>{})['$week'] = {
-      'day': today,
-      'complete': complete,
-    };
-    _save();
-  }
-
-  String exportResearchSummary() {
-    if (researchParticipation == null) {
-      throw StateError('Persetujuan ringkasan diperlukan.');
-    }
-    return const JsonEncoder.withIndent('  ').convert({
-      'schema_version': 2,
-      'participant_code': researchParticipation!['code'],
-      'weeks': [
-        for (var week = 1; week <= 4; week++) researchSummary(week).toJson(),
-      ],
-    });
   }
 
   /// Only notes can be edited: measured timer/GPS data is immutable.

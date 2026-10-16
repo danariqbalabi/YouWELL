@@ -133,7 +133,8 @@ List<String> suggestedSwaps({
       (row) =>
           row['product'] == product &&
           row['trigger'] == trigger &&
-          row['activity'] == activity &&
+          (row['activity'] == activity ||
+              (row['activities'] as List?)?.contains(activity) == true) &&
           isSwapAttempt(row),
     );
     final skipped = matches.where((row) => row['outcome'] == 'skipped').length;

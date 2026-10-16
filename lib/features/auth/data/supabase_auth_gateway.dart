@@ -72,7 +72,34 @@ class SupabaseAuthGateway implements AuthGateway {
 
   @override
   Future<void> deleteAccount() async {
+    await _deleteOwnPhotos();
     // The server derives the account from the JWT; no ID is sent.
     await client.rpc('delete_youwell_account');
+  }
+
+  /// Storage files are not removed by deleting the auth user, so this
+  /// account's Community photos go first. A failure aborts the deletion.
+  Future<void> _deleteOwnPhotos() async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return;
+    final photos = client.storage.from('community');
+    // list() returns up to 100 files per call; the round cap only stops a
+    // loop if a removal were silently refused.
+    for (var round = 0; round < 20; round++) {
+      final List<FileObject> files;
+      try {
+        files = await photos.list(path: userId);
+      } on StorageException catch (error) {
+        // Before the phase 5 migration there is no bucket and no photo.
+        if (error.statusCode == '404' ||
+            error.message.toLowerCase().contains('not found')) {
+          return;
+        }
+        rethrow;
+      }
+      if (files.isEmpty) return;
+      await photos.remove([for (final file in files) '$userId/${file.name}']);
+    }
+    throw StateError('Community photos could not be removed');
   }
 }

@@ -83,7 +83,7 @@ class _MobileCompanionState extends State<MobileCompanion>
     return Semantics(
       button: true,
       label:
-          '$companionName, ${companionStageName(stage)}, tahap $stage dari 5. Sentuh untuk menyapa.',
+          '${controller.companionDisplayName}, ${companionStageName(stage)}, tahap $stage dari 5. Sentuh untuk menyapa.',
       child: GestureDetector(
         onTap: () {
           _react();

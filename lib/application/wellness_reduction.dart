@@ -32,13 +32,19 @@ extension ReductionSupport on WellnessController {
 
   /// Idempotency is per submitted moment, not an arbitrary ten-minute lock.
   /// A tried activity earns the daily quest equally for either honest outcome.
+  /// [activities] lists every activity tried (several may be picked);
+  /// [activity] alone is the single-choice form older callers use.
   bool recordHabitSwap({
     required String eventId,
     required String product,
     required String trigger,
-    required String activity,
+    String activity = '',
+    List<String> activities = const [],
     required String outcome,
   }) {
+    final tried = outcome == 'not_tried'
+        ? const <String>[]
+        : {...activities, if (activity.isNotEmpty) activity}.toList();
     if ((!reduction && !hasOpenHabitSwapMission) ||
         uatProgramComplete ||
         eventId.isEmpty ||
@@ -48,7 +54,9 @@ extension ReductionSupport on WellnessController {
             !productsFor(nicotineProduct).contains(product)) ||
         !triggersFor(product).contains(trigger) ||
         !swapOutcomeLabels.containsKey(outcome) ||
-        (outcome != 'not_tried' && !swapActivityLabels.containsKey(activity)) ||
+        (outcome != 'not_tried' &&
+            (tried.isEmpty ||
+                !tried.every(swapActivityLabels.containsKey))) ||
         habitSwaps.any((row) => row['eventId'] == eventId)) {
       return false;
     }
@@ -56,8 +64,11 @@ extension ReductionSupport on WellnessController {
       'eventId': eventId,
       'product': product,
       'trigger': trigger,
-      'activity': outcome == 'not_tried' ? null : activity,
-      'swap': outcome == 'not_tried' ? null : swapActivityLabels[activity],
+      'activity': tried.firstOrNull,
+      if (tried.length > 1) 'activities': tried,
+      'swap': tried.isEmpty
+          ? null
+          : tried.map((key) => swapActivityLabels[key]).join(', '),
       'outcome': outcome,
     });
     _applyHabitSwapEvidence();

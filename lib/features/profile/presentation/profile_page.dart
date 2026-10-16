@@ -1,9 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:youwell/features/companion/presentation/companion_page.dart';
+import 'package:youwell/shared/widgets/ui_helpers.dart';
 import 'package:youwell/application/app_auth_controller.dart';
 import 'package:youwell/application/wellness_controller.dart';
-import 'package:youwell/core/platform/platform.dart' as platform;
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/core/theme/appearance_scope.dart';
 import 'package:youwell/features/activity/data/meal_photo_store.dart';
@@ -18,63 +17,26 @@ class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key, required this.controller});
   final WellnessController controller;
 
-  Future<void> _researchConsent(BuildContext context) async {
-    String? code = controller.researchParticipation?['code']?.toString();
-    var agreed = false;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
-          title: const Text('Ringkasan UAT opsional'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Ringkasan berisi jumlah hari dibuka, aktivitas, quest, tingkat tangga, dan Habit Swap. Tidak menyertakan alias, teks pribadi, foto, atau lokasi. '
-                  '${AccountScope.maybeOf(context)?.researchStore != null ? 'Setelah kamu setuju, ringkasan angka dan kodemu dikirim otomatis ke tim peneliti saat online, sampai minggu ke-4.' : 'Ekspor dan bagikan hanya jika kamu setuju.'}',
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  initialValue: code,
-                  decoration: const InputDecoration(
-                    labelText: 'Kode dari peneliti',
-                  ),
-                  items: [
-                    for (var i = 1; i <= 10; i++)
-                      DropdownMenuItem(value: 'P$i', child: Text('P$i')),
-                  ],
-                  onChanged: (value) => update(() => code = value),
-                ),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Saya setuju menyiapkan ringkasan ini.'),
-                  value: agreed,
-                  onChanged: (value) => update(() => agreed = value == true),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Batal'),
-            ),
-            FilledButton(
-              onPressed: agreed && code != null
-                  ? () {
-                      controller.setResearchParticipation(code, consent: true);
-                      Navigator.pop(dialogContext);
-                      AccountScope.maybeOf(context)?.submitResearch();
-                    }
-                  : null,
-              child: const Text('Simpan persetujuan'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Future<void> _editAlias(BuildContext context) => showDialog<String>(
+    context: context,
+    builder: (_) => TextEntryDialog(
+      title: 'Ganti nama panggilan',
+      message: 'Tampil di Community, bukan nama asli.',
+      hint: controller.profile?['alias']?.toString(),
+      maxLength: 20,
+      maxLines: 1,
+      minLength: 3,
+      confirmLabel: 'Simpan',
+      onSubmit: (alias) async {
+        try {
+          controller.setAlias(alias);
+          return null;
+        } on ArgumentError {
+          return '3–20 karakter, diawali huruf (huruf/angka/_).';
+        }
+      },
+    ),
+  );
 
   void _switchPath(BuildContext context, bool enabled) =>
       controller.switchPath(enabled);
@@ -150,9 +112,7 @@ class ProfilePage extends StatelessWidget {
           child: Text(
             'Profil, progres, post, reaksi, dan laporanmu di server dihapus '
             'permanen. Data dan foto akun ini di perangkat juga dihapus. Akun '
-            'Google-mu sendiri tidak terpengaruh.\n\nRingkasan penelitian '
-            'berkode yang sudah terkirim tidak terhubung ke akunmu dan dihapus '
-            'tim setelah analisis.',
+            'Google-mu sendiri tidak terpengaruh.',
           ),
         ),
         actions: [
@@ -196,73 +156,6 @@ class ProfilePage extends StatelessWidget {
       );
     }
   }
-
-  /// Optional UAT summary: code, consent, export, and withdrawal.
-  void _researchSheet(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    builder: (_) => AnimatedBuilder(
-      animation: controller,
-      builder: (sheetContext, _) {
-        final joined = controller.researchParticipation;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Ringkasan penelitian',
-                  style: Theme.of(sheetContext).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  joined == null
-                      ? 'Opsional. Kamu tetap bisa memakai aplikasi tanpa ikut penelitian.'
-                      : 'Kode ${joined['code']} · hanya ringkasan angka, tanpa alias, teks, foto, atau lokasi.',
-                  style: TextStyle(color: sheetContext.colors.muted),
-                ),
-                const SizedBox(height: 16),
-                if (joined == null)
-                  FilledButton(
-                    onPressed: () => _researchConsent(sheetContext),
-                    child: const Text('Atur persetujuan & kode'),
-                  )
-                else ...[
-                  FilledButton.icon(
-                    onPressed: () => platform.download(
-                      'youwell-uat-summary.json',
-                      utf8.encode(controller.exportResearchSummary()),
-                      'application/json',
-                    ),
-                    icon: const Icon(Icons.download_rounded),
-                    label: const Text('Ekspor ringkasan'),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton(
-                    onPressed: () => controller.setResearchParticipation(
-                      null,
-                      consent: false,
-                    ),
-                    child: const Text('Tarik persetujuan'),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Tidak menarik ringkasan yang sudah terkirim atau kamu bagikan ke peneliti.',
-                    style: TextStyle(
-                      color: sheetContext.colors.muted,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    ),
-  );
 
   Widget _mobileBuild(BuildContext context) {
     final appearance = AppearanceScope.of(context);
@@ -335,6 +228,21 @@ class ProfilePage extends StatelessWidget {
                 ],
               ],
             ),
+            const _Heading('Nama'),
+            _Group(
+              children: [
+                _Row(
+                  icon: Icons.badge_outlined,
+                  label: 'Nama panggilan: ${profile['alias']}',
+                  onTap: () => _editAlias(context),
+                ),
+                _Row(
+                  icon: Icons.spa_outlined,
+                  label: 'Nama companion: ${controller.companionDisplayName}',
+                  onTap: () => renameCompanion(context, controller),
+                ),
+              ],
+            ),
             const _Heading('Preferensi'),
             _Group(
               children: [
@@ -386,20 +294,6 @@ class ProfilePage extends StatelessWidget {
             const _Heading('Data & privasi'),
             _Group(
               children: [
-                _Row(
-                  icon: Icons.download_rounded,
-                  label: 'Ekspor data',
-                  onTap: () => platform.download(
-                    'youwell-${controller.today}.json',
-                    utf8.encode(controller.export()),
-                    'application/json',
-                  ),
-                ),
-                _Row(
-                  icon: Icons.science_outlined,
-                  label: 'Ringkasan penelitian (opsional)',
-                  onTap: () => _researchSheet(context),
-                ),
                 _Row(
                   icon: Icons.delete_outline_rounded,
                   label: AccountScope.maybeOf(context)?.progress == null

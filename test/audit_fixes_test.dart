@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/utils/date_key.dart';
 import 'package:youwell/features/community/data/local_community_store.dart';
-import 'package:youwell/features/progress/domain/research_log_store.dart';
+import 'package:youwell/features/progress/domain/research_store.dart';
 import 'package:youwell/features/sync/domain/cloud_progress.dart';
 
 import 'support/sim.dart';
@@ -17,25 +17,28 @@ void main() {
     expect(daysBetweenKeys('2026-11-21', '2026-10-24'), -28);
   });
 
-  test('After the welcome-back step, quiet weeks keep the 7-day cadence', () async {
-    final sim = Sim();
-    await sim.start(pace: 3);
-    sim.doLadder();
-    final start = sim.now;
-    sim.now = start.add(const Duration(days: 6));
-    sim.controller.prepareToday();
-    expect(sim.controller.ladderSteps['Body'], 2);
-    expect(sim.controller.capacity['Body']!['change'], 'rest');
+  test(
+    'After the welcome-back step, quiet weeks keep the 7-day cadence',
+    () async {
+      final sim = Sim();
+      await sim.start(pace: 3);
+      sim.doLadder();
+      final start = sim.now;
+      sim.now = start.add(const Duration(days: 6));
+      sim.controller.prepareToday();
+      expect(sim.controller.ladderSteps['Body'], 2);
+      expect(sim.controller.capacity['Body']!['change'], 'rest');
 
-    // Five more quiet days is not a new evaluation period yet.
-    sim.now = start.add(const Duration(days: 11));
-    sim.controller.prepareToday();
-    expect(sim.controller.ladderSteps['Body'], 2);
+      // Five more quiet days is not a new evaluation period yet.
+      sim.now = start.add(const Duration(days: 11));
+      sim.controller.prepareToday();
+      expect(sim.controller.ladderSteps['Body'], 2);
 
-    sim.now = start.add(const Duration(days: 13));
-    sim.controller.prepareToday();
-    expect(sim.controller.ladderSteps['Body'], 1);
-  });
+      sim.now = start.add(const Duration(days: 13));
+      sim.controller.prepareToday();
+      expect(sim.controller.ladderSteps['Body'], 1);
+    },
+  );
 
   test('A clock set forward and back does not freeze ladder reviews', () async {
     final sim = Sim();
@@ -78,9 +81,7 @@ void main() {
     );
     expect(result.tooFast, isFalse);
     expect(
-      sim.controller.workoutSessions.where(
-        (row) => row['day'] == '2026-10-25',
-      ),
+      sim.controller.workoutSessions.where((row) => row['day'] == '2026-10-25'),
       hasLength(1),
     );
     sim.now = DateTime(2026, 10, 26, 0, 1);
@@ -148,37 +149,14 @@ void main() {
     expect(WellnessController(saved: saved).workoutDraft, isNull);
   });
 
-  test('Research weeks are sent daily while running and once complete', () async {
-    final sim = Sim();
-    await sim.start();
-    final c = sim.controller;
-    expect(c.researchWeeksDue, isEmpty, reason: 'no consent, nothing sent');
-    c.setResearchParticipation('P3', consent: true);
-    expect(c.researchWeeksDue, [1]);
-    c.markResearchSent(1, complete: false);
-    expect(c.researchWeeksDue, isEmpty, reason: 'once per day');
-    sim.nextDay();
-    expect(c.researchWeeksDue, [1]);
-    for (var i = 0; i < 6; i++) {
-      sim.nextDay();
-    }
-    expect(c.researchWeekComplete(1), isTrue);
-    expect(c.researchWeeksDue, [1, 2]);
-    c.markResearchSent(1, complete: true);
-    c.markResearchSent(2, complete: false);
-    expect(c.researchWeeksDue, isEmpty);
-    final summary = c.researchSummary(1).toJson();
-    expect(
-      summary.keys.where((key) => key.contains('alias') || key == 'user_id'),
-      isEmpty,
-    );
-    c.setResearchParticipation(null, consent: false);
-    expect(c.researchWeeksDue, isEmpty);
-  });
-
   test('Research CSV keeps the agreed columns and quotes safely', () {
-    final csv = researchCsv([
-      {'participant_code': 'P3', 'week': 1, 'active': true, 'ladder_jeda': null},
+    final csv = toCsv(researchCsvColumns, [
+      {
+        'participant_code': 'P3',
+        'week': 1,
+        'active': true,
+        'ladder_jeda': null,
+      },
       {'participant_code': 'P1, "x"', 'week': 2},
     ]).split('\n');
     expect(csv.first, researchCsvColumns.join(','));
@@ -219,5 +197,69 @@ void main() {
       (await store.feed()).firstWhere((post) => post.id == mine.id).status,
       'approved',
     );
+  });
+
+  test('Alias and companion name can be edited and are synced', () async {
+    final sim = Sim();
+    await sim.start();
+    final c = sim.controller;
+    expect(c.companionDisplayName, 'Welli');
+    expect(c.setCompanionName('  Kuncup  '), isTrue);
+    expect(c.companionDisplayName, 'Kuncup');
+    expect(c.setCompanionName(''), isFalse);
+    expect(c.setCompanionName('x' * 21), isFalse);
+    expect(() => c.setAlias('1bad'), throwsArgumentError);
+    c.setAlias('pagi_cerah');
+    final profile = CloudProgress.project(c.export())['profile'] as Map;
+    expect(profile['alias'], 'pagi_cerah');
+    expect(profile['companionName'], 'Kuncup');
+  });
+
+  test('Authors delete only their own Community posts', () async {
+    final sim = Sim();
+    await sim.start();
+    final store = LocalCommunityStore(sim.controller);
+    await store.submit('Post milikku sendiri.');
+    final mine = (await store.feed()).firstWhere((post) => post.mine);
+    await store.deletePost('seed-water');
+    expect(
+      (await store.feed()).where((post) => post.id == 'seed-water'),
+      hasLength(1),
+      reason: 'other posts stay',
+    );
+    await store.deletePost(mine.id);
+    expect((await store.feed()).where((post) => post.mine), isEmpty);
+  });
+
+  test('A Habit Swap moment can record several activities', () async {
+    final sim = Sim();
+    await sim.start(path: 'reduction');
+    final c = sim.controller;
+    c.setNicotineProduct('vape');
+    expect(
+      c.recordHabitSwap(
+        eventId: 'multi',
+        product: 'vape',
+        trigger: 'boredom',
+        activities: ['contact', 'water'],
+        outcome: 'skipped',
+      ),
+      isTrue,
+    );
+    final row = c.habitSwaps.single;
+    expect(row['activity'], 'contact');
+    expect(row['activities'], ['contact', 'water']);
+    expect(
+      c.recordHabitSwap(
+        eventId: 'none',
+        product: 'vape',
+        trigger: 'boredom',
+        outcome: 'skipped',
+      ),
+      isFalse,
+      reason: 'a tried outcome needs an activity',
+    );
+    final synced = CloudProgress.project(c.export())['habitSwaps'] as List;
+    expect((synced.single as Map).keys.toSet(), {'id', 'day'});
   });
 }

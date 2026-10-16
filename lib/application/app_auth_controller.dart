@@ -9,7 +9,7 @@ import 'wellness_controller.dart';
 import 'progress_sync_controller.dart';
 import 'package:youwell/features/sync/domain/cloud_progress.dart';
 import 'package:youwell/features/community/domain/community_store.dart';
-import 'package:youwell/features/progress/domain/research_log_store.dart';
+import 'package:youwell/features/progress/domain/research_store.dart';
 
 enum AuthStage {
   signedOut,
@@ -38,8 +38,8 @@ class AppAuthController extends ChangeNotifier {
   final Duration timeout;
   final ProgressCloudStore Function(String userId)? progressStore;
   final CommunityStore Function(String userId)? communityStore;
-  final ResearchLogStore? researchStore;
-  bool _sendingResearch = false;
+  /// Researcher dashboard data (admin web only; the server checks MFA).
+  final ResearchStore? researchStore;
   ProgressSyncController? progress;
 
   /// Server Community for the signed-in account; null in local previews.
@@ -212,40 +212,6 @@ class AppAuthController extends ChangeNotifier {
       wellness!.storageError = unreadableStateNotice;
     }
     stage = AuthStage.ready;
-    unawaited(submitResearch());
-  }
-
-  /// Sends due weekly summaries for a consenting UAT participant. Only the
-  /// code and the agreed numbers leave the device; failures retry later.
-  Future<void> submitResearch() async {
-    final store = researchStore, current = wellness;
-    if (store == null ||
-        current == null ||
-        surface != AppSurface.mobile ||
-        _sendingResearch) {
-      return;
-    }
-    _sendingResearch = true;
-    try {
-      for (final week in current.researchWeeksDue) {
-        final code = current.researchParticipation?['code']?.toString();
-        if (code == null) return;
-        final complete = current.researchWeekComplete(week);
-        await store
-            .submit(
-              participantCode: code,
-              weekComplete: complete,
-              summary: current.researchSummary(week).toJson(),
-            )
-            .timeout(timeout);
-        if (_disposed || !identical(current, wellness)) return;
-        current.markResearchSent(week, complete: complete);
-      }
-    } catch (_) {
-      // Offline or not migrated yet: the same weeks stay due.
-    } finally {
-      _sendingResearch = false;
-    }
   }
 
   void _replaceWellness(

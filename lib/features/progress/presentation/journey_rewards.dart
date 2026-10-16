@@ -110,72 +110,18 @@ class JourneyRewards extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('28 hari perjalananmu', style: text.titleMedium),
+              Text('Kalender', style: text.titleMedium),
               const SizedBox(height: 2),
               Text(
                 'Mulai ${shortDate(dayKey(start))} · $sessions sesi gerak dalam 7 hari terakhir',
                 style: TextStyle(color: c.muted, fontSize: 13),
               ),
-              const SizedBox(height: 14),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: 28,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                  mainAxisSpacing: 7,
-                  crossAxisSpacing: 7,
-                ),
-                itemBuilder: (context, index) {
-                  final day = shiftDayKey(dayKey(start), index);
-                  final full = fullDays.contains(day),
-                      done = doneDays.contains(day),
-                      today = day == controller.today;
-                  final future = day.compareTo(controller.today) > 0;
-                  final state = full
-                      ? 'hari penuh'
-                      : done
-                      ? 'aktif'
-                      : future
-                      ? 'belum tiba'
-                      : 'istirahat';
-                  return Tooltip(
-                    message: '${dayLabel(day, controller.now)} · $state',
-                    child: Semantics(
-                      label: 'Hari ${index + 1}, $state',
-                      child: Container(
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: full
-                              ? c.success
-                              : done
-                              ? c.xp
-                              : future
-                              ? c.raised.withValues(alpha: .5)
-                              : c.raised,
-                          borderRadius: BorderRadius.circular(10),
-                          border: today
-                              ? Border.all(color: c.text, width: 2)
-                              : null,
-                        ),
-                        child: full
-                            ? Icon(Icons.star_rounded, color: c.card, size: 20)
-                            : Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: done
-                                      ? const Color(0xff3b1a02)
-                                      : future
-                                      ? c.muted.withValues(alpha: .6)
-                                      : c.muted,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                      ),
-                    ),
-                  );
-                },
+              const SizedBox(height: 10),
+              _MonthCalendar(
+                controller: controller,
+                start: start,
+                doneDays: doneDays,
+                fullDays: fullDays,
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -332,6 +278,176 @@ class BadgeGrid extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+const _monthNames = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+];
+
+/// A normal month view (Monday first) with the journey's day colours,
+/// browsable from the start month up to the current month.
+class _MonthCalendar extends StatefulWidget {
+  const _MonthCalendar({
+    required this.controller,
+    required this.start,
+    required this.doneDays,
+    required this.fullDays,
+  });
+  final WellnessController controller;
+  final DateTime start;
+  final Set<String> doneDays, fullDays;
+
+  @override
+  State<_MonthCalendar> createState() => _MonthCalendarState();
+}
+
+class _MonthCalendarState extends State<_MonthCalendar> {
+  late DateTime _month = DateTime(
+    widget.controller.now.year,
+    widget.controller.now.month,
+  );
+
+  DateTime get _first => DateTime(widget.start.year, widget.start.month);
+  DateTime get _last =>
+      DateTime(widget.controller.now.year, widget.controller.now.month);
+
+  void _shift(int months) =>
+      setState(() => _month = DateTime(_month.year, _month.month + months));
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final controller = widget.controller;
+    final startKey = dayKey(widget.start);
+    final leading = _month.weekday - 1;
+    final days = DateTime(_month.year, _month.month + 1, 0).day;
+    return Column(
+      children: [
+        Row(
+          children: [
+            IconButton(
+              tooltip: 'Bulan sebelumnya',
+              onPressed: _month.isAfter(_first) ? () => _shift(-1) : null,
+              icon: const Icon(Icons.chevron_left_rounded),
+            ),
+            Expanded(
+              child: Text(
+                '${_monthNames[_month.month - 1]} ${_month.year}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Bulan berikutnya',
+              onPressed: _month.isBefore(_last) ? () => _shift(1) : null,
+              icon: const Icon(Icons.chevron_right_rounded),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            for (final name in const [
+              'Sen',
+              'Sel',
+              'Rab',
+              'Kam',
+              'Jum',
+              'Sab',
+              'Min',
+            ])
+              Expanded(
+                child: Text(
+                  name,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: c.muted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: leading + days,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisSpacing: 7,
+            crossAxisSpacing: 7,
+          ),
+          itemBuilder: (context, index) {
+            if (index < leading) return const SizedBox.shrink();
+            final date = index - leading + 1;
+            final day = dayKey(DateTime(_month.year, _month.month, date));
+            final full = widget.fullDays.contains(day),
+                done = widget.doneDays.contains(day),
+                today = day == controller.today;
+            final future = day.compareTo(controller.today) > 0;
+            final outside = day.compareTo(startKey) < 0;
+            final state = full
+                ? 'hari penuh'
+                : done
+                ? 'aktif'
+                : future
+                ? 'belum tiba'
+                : outside
+                ? 'sebelum mulai'
+                : 'istirahat';
+            final faded = future || outside;
+            return Tooltip(
+              message: '${dayLabel(day, controller.now)} · $state',
+              child: Semantics(
+                label: '$date ${_monthNames[_month.month - 1]}, $state',
+                child: Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: full
+                        ? c.success
+                        : done
+                        ? c.xp
+                        : faded
+                        ? c.raised.withValues(alpha: .5)
+                        : c.raised,
+                    borderRadius: BorderRadius.circular(10),
+                    border: today ? Border.all(color: c.text, width: 2) : null,
+                  ),
+                  child: full
+                      ? Icon(Icons.star_rounded, color: c.card, size: 20)
+                      : Text(
+                          '$date',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: done
+                                ? const Color(0xff3b1a02)
+                                : faded
+                                ? c.muted.withValues(alpha: .6)
+                                : c.muted,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

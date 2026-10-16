@@ -1,14 +1,9 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/core/config/app_environment.dart';
 import 'package:youwell/features/community/domain/community_store.dart';
 import 'package:youwell/features/community/presentation/community_page.dart';
-import 'package:youwell/core/platform/platform.dart' as platform;
-import 'package:youwell/features/auth/presentation/account_scope.dart';
-import 'package:youwell/features/progress/domain/research_log_store.dart';
 
 const _reasonLabels = {'unsafe': 'Tidak aman', 'spam': 'Spam'};
 
@@ -44,30 +39,6 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
       }
     } on CommunityException catch (error) {
       if (mounted) setState(() => _error = error.message);
-    }
-  }
-
-  /// Researchers download the latest weekly logs: codes and numbers only.
-  Future<void> _exportResearch(ResearchLogStore store) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final rows = await store.exportLatest();
-      platform.download(
-        'youwell-research-logs.csv',
-        utf8.encode(researchCsv(rows)),
-        'text/csv',
-      );
-      messenger.showSnackBar(
-        SnackBar(content: Text('${rows.length} baris diunduh.')),
-      );
-    } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Ringkasan belum bisa diunduh. Periksa koneksi dan migration tahap 4.',
-          ),
-        ),
-      );
     }
   }
 
@@ -108,17 +79,6 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
             style: TextStyle(color: context.colors.muted),
           ),
           const SizedBox(height: 24),
-          if (AccountScope.maybeOf(context)?.researchStore case final research?) ...[
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: () => _exportResearch(research),
-                icon: const Icon(Icons.download_rounded),
-                label: const Text('Unduh ringkasan penelitian (CSV)'),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
           if (!_store.shared && AppEnvironment.showPreviewTools) ...[
             Align(
               alignment: Alignment.centerLeft,
@@ -294,7 +254,9 @@ class _ModerationCard extends StatelessWidget {
           const Chip(label: Text('Contoh lokal')),
           const SizedBox(height: 8),
         ],
-        Text(post.body, style: const TextStyle(height: 1.5)),
+        PostPhoto(post: post),
+        if (post.body.isNotEmpty)
+          Text(post.body, style: const TextStyle(height: 1.5)),
         const SizedBox(height: 16),
         Wrap(
           spacing: 10,

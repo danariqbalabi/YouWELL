@@ -1,8 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/community_store.dart';
+import 'community_photo.dart';
 import 'package:youwell/features/auth/data/fresh_session.dart';
 
-/// Community through the phase 3 RPCs only; tables are not exposed directly.
+/// Community through the phase 3/5 RPCs; tables are not exposed directly.
+/// Photos sit in the private `community` bucket and are shown through
+/// short-lived signed links.
 class SupabaseCommunityStore implements CommunityStore {
   SupabaseCommunityStore({
     required this.client,
@@ -13,20 +18,28 @@ class SupabaseCommunityStore implements CommunityStore {
   final SupabaseClient client;
   final String userId, url, publishableKey;
 
+  static const bucket = 'community';
+
   @override
   bool get shared => true;
 
-  // As in progress sync: bind each request to this account's JWT, so an
-  // account switch can never send A's action as B.
-  Future<T> _call<T>(String function, [Map<String, dynamic>? params]) async {
-    final Session session;
+  @override
+  bool get supportsPhotos => true;
+
+  Future<Session> _session() async {
     try {
-      session = await freshSession(client, userId);
+      return await freshSession(client, userId);
     } catch (_) {
       throw const CommunityException(
         'Sesi login perlu diperbarui. Periksa koneksi lalu coba lagi.',
       );
     }
+  }
+
+  // As in progress sync: bind each request to this account's JWT, so an
+  // account switch can never send A's action as B.
+  Future<T> _call<T>(String function, [Map<String, dynamic>? params]) async {
+    final session = await _session();
     final request = PostgrestClient(
       '$url/rest/v1',
       headers: {
@@ -55,19 +68,84 @@ class SupabaseCommunityStore implements CommunityStore {
     'P0002' => 'Post ini sudah tidak tersedia.',
     '54000' => 'Masih ada 3 post menunggu review. Tunggu moderator dulu ya.',
     '42501' => 'Akses ini butuh akun admin dengan verifikasi dua langkah.',
-    '22023' => 'Tulis 3–$maxCommunityPostLength karakter.',
+    '22023' when error.message.contains('Photo') =>
+      'Foto belum terunggah. Coba kirim lagi.',
+    '22023' => 'Tulis 3–$maxCommunityPostLength karakter, atau tambahkan foto.',
     _ => 'Community belum terhubung. Periksa koneksi lalu coba lagi.',
   };
+
+  /// Adds a signed link to every post with a photo. A failed link only
+  /// hides that photo; the posts still load.
+  Future<List<CommunityPost>> _withImages(List<CommunityPost> posts) async {
+    final paths = [
+      for (final post in posts)
+        if (post.imagePath case final path?) path,
+    ];
+    if (paths.isEmpty) return posts;
+    try {
+      await _session();
+      final links = await client.storage
+          .from(bucket)
+          .createSignedUrlsResult(paths, 3600);
+      final byPath = {
+        for (final link in links.whereType<SignedUrlSuccess>())
+          link.path: link.signedUrl,
+      };
+      return [
+        for (final post in posts) post.withImageUrl(byPath[post.imagePath]),
+      ];
+    } catch (_) {
+      return posts;
+    }
+  }
 
   @override
   Future<List<CommunityPost>> feed() async {
     final rows = await _call<List>('youwell_community_feed');
-    return [for (final row in rows.whereType<Map>()) CommunityPost.fromJson(row)];
+    return _withImages([
+      for (final row in rows.whereType<Map>()) CommunityPost.fromJson(row),
+    ]);
   }
 
   @override
-  Future<void> submit(String text) =>
-      _call<Object?>('submit_youwell_post', {'p_body': text.trim()});
+  Future<void> submit(String text, {Uint8List? photo}) async {
+    String? path;
+    if (photo != null) {
+      await _session();
+      path = '$userId/${randomUuid()}.png';
+      try {
+        await client.storage
+            .from(bucket)
+            .uploadBinary(
+              path,
+              photo,
+              fileOptions: const FileOptions(contentType: 'image/png'),
+            );
+      } catch (_) {
+        throw const CommunityException(
+          'Foto belum bisa diunggah. Periksa koneksi lalu coba lagi.',
+        );
+      }
+    }
+    try {
+      await _call<Object?>('submit_youwell_post', {
+        'p_body': text.trim(),
+        'p_image_path': path,
+      });
+    } catch (_) {
+      // Do not leave an orphan photo behind a post that was never created.
+      if (path != null) await _remove(path);
+      rethrow;
+    }
+  }
+
+  Future<void> _remove(String path) async {
+    try {
+      await client.storage.from(bucket).remove([path]);
+    } catch (_) {
+      // Best effort; the file stays private to its author and admins.
+    }
+  }
 
   @override
   Future<void> react(String postId, String? reaction) => _call<Object?>(
@@ -76,42 +154,59 @@ class SupabaseCommunityStore implements CommunityStore {
   );
 
   @override
-  Future<bool> report(String postId, String reason) async =>
-      await _call<bool>('report_youwell_post', {
-        'p_post': postId,
-        'p_reason': reason,
-      });
+  Future<bool> report(String postId, String reason) async => await _call<bool>(
+    'report_youwell_post',
+    {'p_post': postId, 'p_reason': reason},
+  );
 
   @override
   Future<ModerationQueue> moderationQueue() async {
     final value = await _call<Map>('youwell_moderation_queue');
+    final pending = await _withImages([
+      for (final row
+          in ((value['pending'] ?? const []) as List).whereType<Map>())
+        CommunityPost.fromJson(row),
+    ]);
+    final reportRows = ((value['reports'] ?? const []) as List)
+        .whereType<Map>()
+        .toList();
+    final reported = await _withImages([
+      for (final row in reportRows)
+        CommunityPost.fromJson({...row, 'id': row['post_id']}),
+    ]);
     return ModerationQueue(
-      pending: [
-        for (final row in ((value['pending'] ?? const []) as List)
-            .whereType<Map>())
-          CommunityPost.fromJson(row),
-      ],
+      pending: pending,
       reports: [
-        for (final row in ((value['reports'] ?? const []) as List)
-            .whereType<Map>())
+        for (final (index, row) in reportRows.indexed)
           CommunityReport(
             id: row['id'].toString(),
             reason: row['reason'].toString(),
-            post: CommunityPost.fromJson({...row, 'id': row['post_id']}),
+            post: reported[index],
           ),
       ],
     );
   }
 
   @override
-  Future<void> moderate(String postId, {required bool approve}) =>
-      _call<Object?>('moderate_youwell_post', {
-        'p_post': postId,
-        'p_status': approve ? 'approved' : 'rejected',
-        'p_note': approve ? null : 'Tidak sesuai panduan komunitas.',
-      });
+  Future<void> moderate(String postId, {required bool approve}) async {
+    final photo = await _call<Object?>('moderate_youwell_post', {
+      'p_post': postId,
+      'p_status': approve ? 'approved' : 'rejected',
+      'p_note': approve ? null : 'Tidak sesuai panduan komunitas.',
+    });
+    // A rejected post's photo is deleted, not just hidden.
+    if (photo is String) await _remove(photo);
+  }
 
   @override
   Future<void> resolveReport(String reportId) =>
       _call<Object?>('resolve_youwell_report', {'p_report': reportId});
+
+  @override
+  Future<void> deletePost(String postId) async {
+    final photo = await _call<Object?>('delete_youwell_post', {
+      'p_post': postId,
+    });
+    if (photo is String) await _remove(photo);
+  }
 }

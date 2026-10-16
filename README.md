@@ -25,15 +25,6 @@ tidak pernah dicabut. Ini prototipe penelitian tim TRIAD (ICT4D, Fasilkom UI 202
 
 Program berjalan **28 hari**, lalu menampilkan rekap.
 
-## Privasi
-
-- Email hanya untuk login. Yang tampil di aplikasi hanya alias.
-- Foto Meal Snap, rute GPS, dan catatan rokok/vape **tetap di HP** dan tidak
-  pernah diunggah.
-- Peneliti hanya menerima angka mingguan berkode P1–P10, dan hanya dari
-  peserta yang setuju.
-- Akun bisa dihapus kapan saja dari Profil (UU PDP Pasal 8 & 9).
-
 ## Teknologi
 
 Flutter (Android APK + web untuk iPhone) · Supabase (login Google, sinkron,
@@ -55,7 +46,7 @@ Verifikasi sebelum rilis: `flutter analyze` dan `flutter test`.
 
 - **Android**: APK dari `flutter build apk --release`.
 - **iPhone**: buka web app di Safari, lalu **Bagikan → Tambah ke Layar Utama**.
-- **Admin**: web terpisah untuk moderasi dan unduh ringkasan penelitian.
+- **Admin**: web terpisah untuk moderasi Community dan dashboard peneliti.
 
 ## Dokumen lain
 

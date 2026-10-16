@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:youwell/application/wellness_controller.dart';
 import '../domain/community_store.dart';
 
@@ -9,6 +11,9 @@ class LocalCommunityStore implements CommunityStore {
 
   @override
   bool get shared => false;
+
+  @override
+  bool get supportsPhotos => false;
 
   CommunityPost _post(Map<String, dynamic> row) {
     final id = row['id'].toString();
@@ -44,7 +49,7 @@ class LocalCommunityStore implements CommunityStore {
   ];
 
   @override
-  Future<void> submit(String text) async {
+  Future<void> submit(String text, {Uint8List? photo}) async {
     try {
       controller.submitCommunityPost(text);
     } on ArgumentError {
@@ -90,4 +95,8 @@ class LocalCommunityStore implements CommunityStore {
   @override
   Future<void> resolveReport(String reportId) async =>
       controller.resolveCommunityReport(reportId);
+
+  @override
+  Future<void> deletePost(String postId) async =>
+      controller.deleteCommunityPost(postId);
 }

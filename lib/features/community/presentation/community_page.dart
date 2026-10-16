@@ -1,7 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/features/auth/presentation/account_scope.dart';
+import 'package:youwell/features/community/data/community_photo.dart';
 import 'package:youwell/features/community/data/local_community_store.dart';
 import 'package:youwell/features/community/domain/community_store.dart';
 import 'package:youwell/shared/widgets/game_widgets.dart';
@@ -11,7 +15,8 @@ import 'package:youwell/shared/widgets/ui_helpers.dart';
 CommunityStore communityStoreOf(
   BuildContext context,
   WellnessController controller,
-) => AccountScope.maybeOf(context)?.community ?? LocalCommunityStore(controller);
+) =>
+    AccountScope.maybeOf(context)?.community ?? LocalCommunityStore(controller);
 
 class CommunityPage extends StatefulWidget {
   const CommunityPage({super.key, required this.controller});
@@ -71,35 +76,45 @@ class _CommunityPageState extends State<CommunityPage> {
     await _load();
   }
 
-  Future<void> _compose() async {
-    final controller = widget.controller;
-    final sent = await showDialog<String>(
+  Future<void> _delete(CommunityPost post) async {
+    final yes = await showDialog<bool>(
       context: context,
-      builder: (_) => TextEntryDialog(
-        title: 'Bagikan kemenangan kecil',
-        message: 'Post masuk ke antrean moderator sebelum tampil.',
-        hint: 'Hari ini aku berhasil…',
-        maxLength: maxCommunityPostLength,
-        maxLines: 4,
-        minLength: 3,
-        confirmLabel: 'Kirim untuk review',
-        suggestion: (
-          'Isi dengan progres hari ini',
-          () =>
-              'Hari ini aku menyelesaikan ${controller.completedCards.length} '
-              'misi dan sekarang di Level ${controller.level}!',
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hapus post ini?'),
+        content: const Text(
+          'Post, fotonya, dan reaksinya dihapus untuk semua orang.',
         ),
-        onSubmit: (text) async {
-          try {
-            await _store.submit(text);
-            return null;
-          } on CommunityException catch (error) {
-            return error.message;
-          }
-        },
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Hapus'),
+          ),
+        ],
       ),
     );
-    if (sent == null || !mounted) return;
+    if (yes != true || !mounted) return;
+    await _act(() async {
+      await _store.deletePost(post.id);
+      _say('Post dihapus.');
+    });
+  }
+
+  Future<void> _compose() async {
+    final controller = widget.controller;
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ComposeDialog(
+        store: _store,
+        suggestion: () =>
+            'Hari ini aku menyelesaikan ${controller.completedCards.length} '
+            'misi dan sekarang di Level ${controller.level}!',
+      ),
+    );
+    if (sent != true || !mounted) return;
     _say('Post terkirim. Tampil setelah disetujui moderator.');
     await _load();
   }
@@ -108,10 +123,15 @@ class _CommunityPageState extends State<CommunityPage> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final posts = _posts;
-    final wall = posts?.where((post) => post.status == 'approved').toList();
-    final waiting = posts
-        ?.where((post) => post.mine && post.status == 'pending')
-        .length;
+    // Own posts waiting for review show on the wall, tagged, so they can
+    // still be deleted.
+    final wall = posts
+        ?.where(
+          (post) =>
+              post.status == 'approved' ||
+              (post.mine && post.status == 'pending'),
+        )
+        .toList();
     final rejected = posts
         ?.where((post) => post.mine && post.status == 'rejected')
         .length;
@@ -129,7 +149,7 @@ class _CommunityPageState extends State<CommunityPage> {
           ),
           Text(
             _store.shared
-                ? 'Saling semangati dengan alias. Tidak ada peringkat.'
+                ? 'Yuk saling semangati!'
                 : 'Pratinjau di perangkat ini: post tidak terkirim ke orang lain.',
             style: TextStyle(color: c.muted),
           ),
@@ -143,17 +163,6 @@ class _CommunityPageState extends State<CommunityPage> {
             ),
           ),
           const SizedBox(height: 14),
-          if ((waiting ?? 0) > 0)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _InfoCard(
-                icon: Icons.schedule_rounded,
-                title: waiting == 1
-                    ? 'Post kamu sedang direview'
-                    : '$waiting post kamu sedang direview',
-                detail: 'Moderator mengecek post sebelum tampil.',
-              ),
-            ),
           if ((rejected ?? 0) > 0)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -190,6 +199,7 @@ class _CommunityPageState extends State<CommunityPage> {
             for (final post in wall)
               _PostCard(
                 post: post,
+                onDelete: () => _delete(post),
                 onReact: (reaction) => _act(
                   () => _store.react(
                     post.id,
@@ -216,8 +226,8 @@ class _CommunityPageState extends State<CommunityPage> {
 /// Stored reaction keys stay the same; they render as labelled icons.
 const _reactionStyle = {
   '👏': (Icons.celebration_rounded, 'Keren'),
-  '🌱': (Icons.eco_rounded, 'Tumbuh'),
   '✨': (Icons.auto_awesome_rounded, 'Semangat'),
+  '🌱': (Icons.thumb_up_alt_rounded, 'Mantap'),
 };
 
 class _PostCard extends StatelessWidget {
@@ -225,10 +235,12 @@ class _PostCard extends StatelessWidget {
     required this.post,
     required this.onReact,
     required this.onReport,
+    required this.onDelete,
   });
   final CommunityPost post;
   final void Function(String reaction) onReact;
   final void Function(String reason) onReport;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -261,11 +273,20 @@ class _PostCard extends StatelessWidget {
                   ),
                 ),
                 if (post.sample) tag('contoh'),
-                if (post.mine)
-                  tag('post kamu')
-                else
+                if (post.mine) ...[
+                  tag(
+                    post.status == 'pending' ? 'menunggu review' : 'post kamu',
+                  ),
+                  IconButton(
+                    tooltip: 'Hapus post',
+                    onPressed: onDelete,
+                    icon: Icon(Icons.delete_outline_rounded, color: c.muted),
+                  ),
+                ] else
                   PopupMenuButton<String>(
-                    tooltip: post.reported ? 'Sudah dilaporkan' : 'Laporkan post',
+                    tooltip: post.reported
+                        ? 'Sudah dilaporkan'
+                        : 'Laporkan post',
                     enabled: !post.reported,
                     icon: Icon(
                       post.reported
@@ -281,27 +302,35 @@ class _PostCard extends StatelessWidget {
                   ),
               ],
             ),
+            const SizedBox(height: 10),
             Padding(
-              padding: const EdgeInsets.fromLTRB(0, 8, 10, 12),
-              child: Text(
-                post.body,
-                style: const TextStyle(fontSize: 15.5, height: 1.5),
+              padding: const EdgeInsets.only(right: 10),
+              child: PostPhoto(post: post),
+            ),
+            if (post.body.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 0, 10, 12),
+                child: Text(
+                  post.body,
+                  style: const TextStyle(fontSize: 15.5, height: 1.5),
+                ),
               ),
-            ),
-            Wrap(
-              spacing: 6,
-              runSpacing: 8,
-              children: [
-                for (final key in communityReactions)
-                  _ReactionButton(
-                    icon: _reactionStyle[key]!.$1,
-                    label: _reactionStyle[key]!.$2,
-                    count: post.reactions[key] ?? 0,
-                    active: post.myReaction == key,
-                    onTap: () => onReact(key),
-                  ),
-              ],
-            ),
+            if (post.status == 'approved')
+              Wrap(
+                spacing: 6,
+                runSpacing: 8,
+                children: [
+                  for (final key in communityReactions)
+                    _ReactionButton(
+                      icon: _reactionStyle[key]!.$1,
+                      label: _reactionStyle[key]!.$2,
+                      count: post.reactions[key] ?? 0,
+                      active: post.myReaction == key,
+                      // Authors see the counts but cannot react to themselves.
+                      onTap: post.mine ? null : () => onReact(key),
+                    ),
+                ],
+              ),
           ],
         ),
       ),
@@ -321,12 +350,12 @@ class _ReactionButton extends StatelessWidget {
   final String label;
   final int count;
   final bool active;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     return Semantics(
-      button: true,
+      button: onTap != null,
       selected: active,
       label: 'Reaksi $label, $count',
       excludeSemantics: true,
@@ -398,4 +427,209 @@ class _InfoCard extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// New post: optional photo (re-encoded on the phone, so no location data)
+/// and a caption that may be empty when a photo is attached.
+class _ComposeDialog extends StatefulWidget {
+  const _ComposeDialog({required this.store, required this.suggestion});
+  final CommunityStore store;
+  final String Function() suggestion;
+
+  @override
+  State<_ComposeDialog> createState() => _ComposeDialogState();
+}
+
+class _ComposeDialogState extends State<_ComposeDialog> {
+  final _text = TextEditingController();
+  Uint8List? _photo;
+  String? _error;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    setState(() => _error = null);
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2000,
+      );
+      if (picked == null || !mounted) return;
+      setState(() => _busy = true);
+      final photo = await prepareCommunityPhoto(await picked.readAsBytes());
+      if (mounted) setState(() => _photo = photo);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Foto belum bisa dipakai. Coba foto lain.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  bool get _ready {
+    final length = _text.text.trim().length;
+    return length <= maxCommunityPostLength && (_photo != null || length >= 3);
+  }
+
+  Future<void> _submit() async {
+    if (!_ready) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.store.submit(_text.text, photo: _photo);
+      if (mounted) Navigator.pop(context, true);
+    } on CommunityException catch (error) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = error.message;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final photo = _photo;
+    return AlertDialog(
+      title: const Text('Bagikan kemenangan kecil'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.store.supportsPhotos
+                  ? 'Post dan foto dicek moderator sebelum tampil. '
+                        'Hindari wajah orang lain atau info pribadi.'
+                  : 'Post masuk ke antrean moderator sebelum tampil.',
+              style: TextStyle(color: c.muted),
+            ),
+            const SizedBox(height: 12),
+            if (photo != null) ...[
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 220),
+                      child: Image.memory(
+                        photo,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        semanticLabel: 'Foto yang akan dibagikan',
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 6,
+                    top: 6,
+                    child: IconButton.filledTonal(
+                      tooltip: 'Hapus foto',
+                      onPressed: _busy
+                          ? null
+                          : () => setState(() => _photo = null),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+            Wrap(
+              spacing: 4,
+              children: [
+                TextButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => setState(() => _text.text = widget.suggestion()),
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                  label: const Text('Isi dengan progres hari ini'),
+                ),
+                if (widget.store.supportsPhotos && photo == null)
+                  TextButton.icon(
+                    onPressed: _busy ? null : _pickPhoto,
+                    icon: const Icon(
+                      Icons.add_photo_alternate_outlined,
+                      size: 18,
+                    ),
+                    label: const Text('Tambah foto'),
+                  ),
+              ],
+            ),
+            TextField(
+              controller: _text,
+              enabled: !_busy,
+              maxLength: maxCommunityPostLength,
+              maxLines: 4,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: photo == null
+                    ? 'Hari ini aku berhasil…'
+                    : 'Tulis keterangan (opsional)',
+                errorText: _error,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
+        FilledButton(
+          onPressed: _busy || !_ready ? null : _submit,
+          child: _busy
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Kirim untuk review'),
+        ),
+      ],
+    );
+  }
+}
+
+/// A post photo through its short-lived link; a broken link shows nothing.
+class PostPhoto extends StatelessWidget {
+  const PostPhoto({super.key, required this.post});
+  final CommunityPost post;
+  @override
+  Widget build(BuildContext context) {
+    final url = post.imageUrl;
+    if (url == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 380),
+          child: Image.network(
+            url,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            semanticLabel: 'Foto dari @${post.alias}',
+            loadingBuilder: (context, child, progress) => progress == null
+                ? child
+                : const SizedBox(
+                    height: 180,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          ),
+        ),
+      ),
+    );
+  }
 }

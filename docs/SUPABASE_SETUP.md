@@ -10,8 +10,7 @@ callback kembali ke APK. Web kembali ke origin build yang sedang dibuka.
 `PROGRESS_SYNC.md`. Cache dipisahkan per project, surface, dan UID Supabase.
 Migration tahap 1 menyiapkan alias privat dan otorisasi admin; tahap 2 menulis
 alias secara atomik dengan progres. **Tahap 3** menghubungkan Community
-multi-user + moderasi admin (MFA), pengiriman `research_logs` mingguan untuk
-peserta UAT yang setuju, dan Hapus akun di server. Tanpa migration tahap 3,
+multi-user + moderasi admin (MFA) dan Hapus akun di server. Tanpa migration tahap 3,
 Community menampilkan pesan belum terhubung dan Hapus akun gagal tanpa
 menghapus data apa pun.
 
@@ -62,6 +61,17 @@ tidak ada izin tabel langsung untuk `anon`/`authenticated`.
 Tahap 4 (`20261016170000_research_export_for_admins.sql`) menambah tombol
 **Unduh ringkasan penelitian (CSV)** di web admin: hanya admin ber-MFA, berisi
 baris terbaru per kode dan minggu.
+Tahap 5 (`20261016190000_dashboard_and_community_photos.sql`) menambah tab
+**Dashboard peneliti** (progres semua akun per alias, hanya admin ber-MFA;
+keputusan tim 16 Okt 2026, proposal dan lembar persetujuan perlu menyebutkannya)
+dan **foto di Community** (bucket privat `community`, foto dikodekan ulang di HP
+sehingga metadata lokasi hilang, tampil setelah post disetujui, terhapus bila
+post ditolak atau akun dihapus).
+Tahap 6 (`20261016210000_names_post_delete_participant_codes.sql`) menerima
+nama panggilan yang diganti dan nama companion, membolehkan pembuat menghapus
+post-nya, serta menyimpan kode peserta P1–P10 yang diberikan admin di Dashboard
+peneliti. **Jalankan tahap 6 sebelum memasang build app terbaru**, karena build
+itu mengirim nama companion yang ditolak server versi lama.
 Schema `private` tidak boleh ditambahkan ke daftar exposed schemas.
 
 Tabel `public.youwell_profiles` memakai RLS pemilik (`auth.uid() = user_id`)
@@ -83,12 +93,11 @@ select has_table_privilege('authenticated', 'public.youwell_research_logs', 'SEL
 select has_function_privilege('anon', 'public.delete_youwell_account()', 'EXECUTE'); -- false
 ```
 
-Data penelitian: baca `public.youwell_research_logs` dari dashboard (satu
-anggota tim). Tabel ini tanpa `user_id`/email/alias. Satu minggu bisa terkirim
-berkali-kali selama minggu itu berjalan (agar keaktifan minggu ke-4 tercatat
-walau peserta tidak membuka aplikasi lagi setelahnya); pakai baris
-`submitted_at` terbaru per `(participant_code, week)`, atau baris
-`week_complete = true` bila ada.
+Data penelitian: di web admin, tab **Dashboard peneliti**, beri kode P1–P10
+pada alias peserta UAT yang sudah menandatangani persetujuan, lalu unduh
+**ringkasan P1–P10 (CSV)**. Ringkasan dihitung dari progres yang tersinkron
+dengan aturan yang sama seperti di app. Aplikasi peserta tidak lagi mengirim
+`research_logs` sendiri; tabel dan tombol tahap 3–4 tetap ada untuk arsip.
 
 ## 3. Konfigurasi Flutter
 
@@ -189,11 +198,22 @@ Pengaturan provider/SQL/Render belum dilakukan otomatis oleh kode.
 6. Admin non-whitelist ditolak; whitelist tanpa MFA tidak masuk; TOTP benar diizinkan.
 7. Uji RLS dengan dua akun setelah migration; client B tidak dapat membaca/mengubah alias A.
 8. Post akun A hanya tampil di B setelah admin menyetujui; reaksi B menambah hitungan; laporan B muncul di admin.
-9. Peserta dengan kode P1–P10 dan persetujuan menghasilkan baris `youwell_research_logs` tanpa alias/email.
+9. Di Dashboard peneliti, akun yang diberi kode P1–P10 muncul di ringkasan P1–P10 (CSV) tanpa alias.
 10. Hapus akun saat offline gagal tanpa menghapus apa pun; saat online menghapus user di Authentication dan semua barisnya.
 
 Tes otomatis tidak membuktikan Google OAuth callback, RLS pada project remote,
 atau TOTP nyata telah berhasil. Perlu akun uji dan SQL pada project target.
+
+Uji migrasi dan aturan akses secara lokal memakai PostgreSQL dalam memori:
+
+```bash
+npm install --prefix .tools/sql-check --no-audit --no-fund @electric-sql/pglite
+node scripts/check-supabase-migrations.cjs
+```
+
+Tes ini memakai fixture Auth/Storage tanpa kredensial atau koneksi ke project
+Supabase nyata. Ia memeriksa urutan migrasi, akses foto Community, gerbang
+MFA admin, kode peserta, sinkron nama, dan penghapusan post milik sendiri.
 
 Referensi resmi: [OAuth Flutter](https://supabase.com/docs/reference/dart/auth-signinwithoauth),
 [Redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls),

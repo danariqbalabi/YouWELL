@@ -131,7 +131,7 @@ class _PlayerCardState extends State<_PlayerCard> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
-    const name = companionName;
+    final name = controller.companionDisplayName;
     final level = controller.level;
 
     final next = companionUnlocks

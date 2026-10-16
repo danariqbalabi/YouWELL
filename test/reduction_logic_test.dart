@@ -430,8 +430,9 @@ void main() {
             isNegative,
           );
         }
-        c.setResearchParticipation('P1', consent: true);
-        final research = c.exportResearchSummary();
+        final research = jsonEncode([
+          for (var week = 1; week <= 4; week++) c.researchSummary(week).toJson(),
+        ]);
         expect(research, isNot(contains('nicotineDays')));
         expect(research, isNot(contains('after_meal')));
         expect(research, isNot(contains('cigarette')));

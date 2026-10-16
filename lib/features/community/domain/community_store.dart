@@ -1,5 +1,9 @@
+import 'dart:typed_data';
+
 /// Reaction keys stored on the server; the UI renders them as labelled icons.
-const communityReactions = ['👏', '🌱', '✨'];
+/// Shown as Keren, Semangat, Mantap. The keys are fixed by the server's
+/// check constraint, so 🌱 (formerly "Tumbuh") now reads "Mantap".
+const communityReactions = ['👏', '✨', '🌱'];
 const communityReportReasons = ['unsafe', 'spam'];
 const maxCommunityPostLength = 280;
 
@@ -15,6 +19,8 @@ class CommunityPost {
     this.myReaction,
     this.reported = false,
     this.moderationNote,
+    this.imagePath,
+    this.imageUrl,
   });
 
   factory CommunityPost.fromJson(Map value) => CommunityPost(
@@ -30,6 +36,22 @@ class CommunityPost {
     myReaction: value['my_reaction']?.toString(),
     reported: value['reported'] == true,
     moderationNote: value['moderation_note']?.toString(),
+    imagePath: value['image_path']?.toString(),
+  );
+
+  CommunityPost withImageUrl(String? url) => CommunityPost(
+    id: id,
+    alias: alias,
+    body: body,
+    status: status,
+    mine: mine,
+    sample: sample,
+    reactions: reactions,
+    myReaction: myReaction,
+    reported: reported,
+    moderationNote: moderationNote,
+    imagePath: imagePath,
+    imageUrl: url,
   );
 
   final String id, alias, body, status;
@@ -38,6 +60,9 @@ class CommunityPost {
   /// Public totals per reaction, including the viewer's own.
   final Map<String, int> reactions;
   final String? myReaction, moderationNote;
+
+  /// Storage path of the post's photo, and a short-lived link to show it.
+  final String? imagePath, imageUrl;
 }
 
 class CommunityReport {
@@ -70,9 +95,13 @@ abstract interface class CommunityStore {
   /// Shared posts on other devices; false for the on-device preview.
   bool get shared;
 
+  /// Photos need the server; the on-device preview has text only.
+  bool get supportsPhotos;
+
   /// Approved posts plus the viewer's own posts, newest first.
   Future<List<CommunityPost>> feed();
-  Future<void> submit(String text);
+  /// [photo] is PNG bytes from `prepareCommunityPhoto`.
+  Future<void> submit(String text, {Uint8List? photo});
 
   /// [reaction] null removes the viewer's reaction.
   Future<void> react(String postId, String? reaction);
@@ -83,4 +112,7 @@ abstract interface class CommunityStore {
   Future<ModerationQueue> moderationQueue();
   Future<void> moderate(String postId, {required bool approve});
   Future<void> resolveReport(String reportId);
+
+  /// Removes the viewer's own post, with its photo, reactions and reports.
+  Future<void> deletePost(String postId);
 }

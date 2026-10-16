@@ -14,7 +14,8 @@ class HabitSwapPanel extends StatefulWidget {
 }
 
 class _HabitSwapPanelState extends State<HabitSwapPanel> {
-  String? _product, _trigger, _activity, _outcome, _error;
+  String? _product, _trigger, _outcome, _error;
+  final _activities = <String>[];
   String _eventId = 'swap-${DateTime.now().microsecondsSinceEpoch}';
   WellnessController get c => widget.controller;
   String? get product =>
@@ -27,7 +28,7 @@ class _HabitSwapPanelState extends State<HabitSwapPanel> {
     if (product == null ||
         _trigger == null ||
         _outcome == null ||
-        (_outcome != 'not_tried' && _activity == null)) {
+        (_outcome != 'not_tried' && _activities.isEmpty)) {
       setState(
         () => _error =
             'Lengkapi jenis penggunaan, pemicu, dan hasil. Pilih aktivitas jika sudah mencoba.',
@@ -38,7 +39,7 @@ class _HabitSwapPanelState extends State<HabitSwapPanel> {
       eventId: _eventId,
       product: product!,
       trigger: _trigger!,
-      activity: _activity ?? '',
+      activities: _activities,
       outcome: _outcome!,
     );
     if (!saved) {
@@ -49,7 +50,8 @@ class _HabitSwapPanelState extends State<HabitSwapPanel> {
       return;
     }
     setState(() {
-      _trigger = _activity = _outcome = _error = null;
+      _trigger = _outcome = _error = null;
+      _activities.clear();
       _eventId = 'swap-${DateTime.now().microsecondsSinceEpoch}';
     });
     ScaffoldMessenger.of(context).showSnackBar(
@@ -134,7 +136,8 @@ class _HabitSwapPanelState extends State<HabitSwapPanel> {
             product,
             (value) {
               _product = value;
-              _trigger = _activity = _outcome = null;
+              _trigger = _outcome = null;
+              _activities.clear();
             },
           ),
         if (plan != null) ...[
@@ -155,12 +158,32 @@ class _HabitSwapPanelState extends State<HabitSwapPanel> {
           _trigger,
           (value) => _trigger = value,
         ),
-        _choices(
+        Text(
           '2. Aktivitas yang kamu coba',
-          {for (final key in activities) key: swapActivityLabels[key]!},
-          _activity,
-          (value) => _activity = value,
+          style: Theme.of(context).textTheme.titleMedium,
         ),
+        const SizedBox(height: 2),
+        Text(
+          'Boleh pilih lebih dari satu.',
+          style: TextStyle(color: context.colors.muted, fontSize: 13),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final key in activities)
+              FilterChip(
+                label: Text(swapActivityLabels[key]!),
+                selected: _activities.contains(key),
+                onSelected: (on) => setState(() {
+                  on ? _activities.add(key) : _activities.remove(key);
+                  _error = null;
+                }),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
         Text(
           c.profile?['lowImpact'] == true
               ? 'Gerak sambil duduk tersedia. Pilih yang terasa nyaman.'
@@ -172,9 +195,13 @@ class _HabitSwapPanelState extends State<HabitSwapPanel> {
               c.reduction &&
                   product != null &&
                   _trigger != null &&
-                  _activity != null
+                  _activities.isNotEmpty
               ? () {
-                  final saved = c.setSwapPlan(product!, _trigger!, _activity!);
+                  final saved = c.setSwapPlan(
+                    product!,
+                    _trigger!,
+                    _activities.first,
+                  );
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(

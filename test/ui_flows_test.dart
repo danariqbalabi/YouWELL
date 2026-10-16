@@ -27,7 +27,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Kirim untuk review'));
     await tester.pumpAndSettle();
-    expect(find.text('Post kamu sedang direview'), findsOneWidget);
+    expect(find.text('menunggu review'), findsOneWidget);
     expect(sim.controller.moderationQueue, hasLength(1));
 
     await tester.tap(find.text('Keren').first);

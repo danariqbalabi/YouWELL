@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:youwell/shared/widgets/ui_helpers.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/features/companion/domain/companion_rewards.dart';
@@ -71,7 +72,16 @@ class _CompanionPageState extends State<CompanionPage> {
         ...companionUnlocks,
       ];
       return Scaffold(
-        appBar: AppBar(title: const Text('Teman kecilmu')),
+        appBar: AppBar(
+          title: Text(controller.companionDisplayName),
+          actions: [
+            IconButton(
+              tooltip: 'Ganti nama',
+              icon: const Icon(Icons.edit_rounded),
+              onPressed: () => renameCompanion(context, controller),
+            ),
+          ],
+        ),
         body: ListView(
           controller: _scroll,
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
@@ -448,3 +458,21 @@ class _RewardTile extends StatelessWidget {
     );
   }
 }
+
+/// Lets the user give the companion their own name (1–20 characters).
+Future<void> renameCompanion(
+  BuildContext context,
+  WellnessController controller,
+) => showDialog<String>(
+  context: context,
+  builder: (_) => TextEntryDialog(
+    title: 'Beri nama companion',
+    message: 'Nama ini tampil di Hari ini dan halaman companion.',
+    hint: controller.companionDisplayName,
+    maxLength: 20,
+    maxLines: 1,
+    confirmLabel: 'Simpan',
+    onSubmit: (name) async =>
+        controller.setCompanionName(name) ? null : 'Pakai 1–20 karakter.',
+  ),
+);

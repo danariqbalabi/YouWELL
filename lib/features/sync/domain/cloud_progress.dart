@@ -42,6 +42,7 @@ abstract final class CloudProgress {
     'trigger',
     'outcome',
     'activity',
+    'activities',
     'eventId',
     'cigarette',
     'vape',
@@ -82,6 +83,7 @@ abstract final class CloudProgress {
               'started',
               'waterGoal',
               'ageGroup',
+              'companionName',
             ])
           : null,
       for (final key in _shared)
@@ -161,6 +163,7 @@ abstract final class CloudProgress {
                   'product',
                   'trigger',
                   'activity',
+                  'activities',
                   'outcome',
                   'swap',
                 ],
