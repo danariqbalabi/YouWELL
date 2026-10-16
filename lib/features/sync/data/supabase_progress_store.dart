@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:youwell/core/types/json_map.dart';
 import '../domain/cloud_progress.dart';
+import 'package:youwell/features/auth/data/fresh_session.dart';
 
 class SupabaseProgressStore implements ProgressCloudStore {
   SupabaseProgressStore({
@@ -15,11 +16,8 @@ class SupabaseProgressStore implements ProgressCloudStore {
 
   // Capture this account's JWT per request. A logout/account switch must not
   // turn an in-flight A snapshot into an authenticated write for account B.
-  PostgrestClient _request() {
-    final session = client.auth.currentSession;
-    if (session == null || session.user.id != userId) {
-      throw StateError('The progress account is no longer signed in');
-    }
+  Future<PostgrestClient> _request() async {
+    final session = await freshSession(client, userId);
     return PostgrestClient(
       '$url/rest/v1',
       headers: {
@@ -33,7 +31,7 @@ class SupabaseProgressStore implements ProgressCloudStore {
 
   @override
   Future<CloudProgressSnapshot?> read() async {
-    final request = _request();
+    final request = await _request();
     try {
       // Poll only a small revision header. Do not download the entire 28-day
       // history every 30 seconds when nothing changed on another device.
@@ -64,7 +62,7 @@ class SupabaseProgressStore implements ProgressCloudStore {
     JsonMap payload, {
     required int expectedRevision,
   }) async {
-    final request = _request();
+    final request = await _request();
     try {
       final row =
           await request.rpc(

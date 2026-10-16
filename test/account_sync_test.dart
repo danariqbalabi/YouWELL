@@ -146,6 +146,7 @@ void main() {
     await sync.write(state('satu', theme: 'dark'));
     await sync.syncNow();
     expect(sync.stage, SyncStage.offline);
+    expect(sync.errorDetail, contains('reply lost'));
     expect(cloud.snapshot?.revision, 2, reason: 'committed despite the error');
 
     await sync.write(state('satu', theme: 'light'));
