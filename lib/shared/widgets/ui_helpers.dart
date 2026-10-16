@@ -109,3 +109,119 @@ Widget meter(double value, String label, String detail) => Builder(
     ),
   ),
 );
+
+/// A text dialog that owns its controller, so the field is never disposed
+/// while the closing animation still renders it. Pops with the trimmed text.
+class TextEntryDialog extends StatefulWidget {
+  const TextEntryDialog({
+    super.key,
+    required this.title,
+    required this.confirmLabel,
+    required this.maxLength,
+    this.message,
+    this.hint,
+    this.maxLines = 3,
+    this.minLength = 1,
+    this.suggestion,
+    this.onSubmit,
+  });
+  final String title, confirmLabel;
+  final String? message, hint;
+  final int maxLength, maxLines, minLength;
+
+  /// Optional helper button that fills the field, e.g. today's progress.
+  final (String label, String Function() text)? suggestion;
+
+  /// Returns an error to keep the dialog open, or null once the text is used.
+  final Future<String?> Function(String text)? onSubmit;
+
+  @override
+  State<TextEntryDialog> createState() => _TextEntryDialogState();
+}
+
+class _TextEntryDialogState extends State<TextEntryDialog> {
+  final _text = TextEditingController();
+  String? _error;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final value = _text.text.trim();
+    if (value.length < widget.minLength) {
+      setState(
+        () => _error = 'Tulis ${widget.minLength}–${widget.maxLength} karakter.',
+      );
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final error = await widget.onSubmit?.call(value);
+    if (!mounted) return;
+    if (error != null) {
+      setState(() {
+        _busy = false;
+        _error = error;
+      });
+      return;
+    }
+    Navigator.pop(context, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final suggestion = widget.suggestion;
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (widget.message case final message?) ...[
+              Text(message, style: TextStyle(color: context.colors.muted)),
+              const SizedBox(height: 12),
+            ],
+            if (suggestion != null)
+              TextButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () => setState(() => _text.text = suggestion.$2()),
+                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: Text(suggestion.$1),
+              ),
+            TextField(
+              controller: _text,
+              enabled: !_busy,
+              maxLength: widget.maxLength,
+              maxLines: widget.maxLines,
+              decoration: InputDecoration(
+                hintText: widget.hint,
+                errorText: _error,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
+        ValueListenableBuilder(
+          valueListenable: _text,
+          builder: (context, value, _) => FilledButton(
+            onPressed: _busy || value.text.trim().isEmpty ? null : _submit,
+            child: Text(widget.confirmLabel),
+          ),
+        ),
+      ],
+    );
+  }
+}

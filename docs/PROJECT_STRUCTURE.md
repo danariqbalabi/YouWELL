@@ -16,7 +16,7 @@ lib/
 │   ├── profile/         # preferences dan kontrol data
 │   ├── progress/        # insight progress mobile
 │   ├── sync/            # proyeksi privat, snapshot cloud/CAS, status & konflik
-│   └── reduction/       # Delay Craving & Habit Swap (jalur rokok/vape)
+│   └── reduction/       # Habit Swap tanpa timer (jalur rokok/vape)
 └── shared/widgets/      # komponen visual lintas fitur
 ```
 

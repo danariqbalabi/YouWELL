@@ -87,15 +87,27 @@ void main() {
       },
     );
 
-    test('Smoking/vaping path: Jeda on every card, plus 2 others', () async {
-      final sim = Sim();
-      await sim.start(path: 'reduction');
-      for (final card in sim.cards) {
-        final categories = sim.categoriesOf(card);
-        expect(categories.first, 'Reduction');
-        expect(categories, hasLength(3));
-      }
-    });
+    test(
+      'Smoking/vaping path: one Habit Swap on every card, plus 2 others',
+      () async {
+        final sim = Sim();
+        await sim.start(path: 'reduction');
+        for (final card in sim.cards) {
+          final categories = sim.categoriesOf(card);
+          expect(categories.first, 'Reduction');
+          expect(categories, hasLength(3));
+          final tasks = sim.tasksOf(card);
+          expect(
+            tasks.where((task) => task['activityKind'] == 'habit_swap'),
+            hasLength(1),
+          );
+          expect(
+            tasks.where((task) => task['activityKind'] == 'delay'),
+            isEmpty,
+          );
+        }
+      },
+    );
 
     test('Least-practised category appears on most cards', () async {
       final sim = Sim();
@@ -486,21 +498,27 @@ void main() {
     });
 
     test(
-      'Matches the weekly log table: opens, active, Delay Craving',
+      'Weekly logs count Habit Swap; retired timer counters stay zero for new use',
       () async {
         final sim = Sim();
         await sim.start(path: 'reduction');
         // Opened on 3 days of week 1; nothing done on the third.
         sim.doLadder(category: 'Reduction');
         sim.nextDay();
-        sim.controller.recordHabitDelay();
-        sim.controller.recordHabitDelay(minutes: 2, completed: false);
+        sim.controller.recordHabitSwap(
+          eventId: 'moment-${sim.controller.habitSwaps.length}',
+          product: 'cigarette',
+          trigger: 'after_meal',
+          activity: 'contact',
+          outcome: 'used',
+        );
         sim.nextDay();
         final week1 = sim.controller.researchSummary(1).toJson();
         expect(week1['opened_days'], 3);
         expect(week1['active'], isTrue);
-        expect(week1['delay_craving_count'], 2);
-        expect(week1['delay_craving_completed'], 1);
+        expect(week1['delay_craving_count'], 0);
+        expect(week1['delay_craving_completed'], 0);
+        expect(week1['habit_swap_count'], 2);
 
         final week2 = sim.controller.researchSummary(2).toJson();
         expect(week2['opened_days'], 0);

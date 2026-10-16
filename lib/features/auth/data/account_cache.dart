@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youwell/core/config/app_mode.dart';
+import 'package:youwell/data/models/wellness_snapshot.dart';
 
 /// Device-only cache. It deliberately does not upload snapshots or photo paths.
 class AccountCache {
@@ -19,9 +20,23 @@ class AccountCache {
   String get _legacyKey => storageKeyForSurface(baseKey, surface);
   String get _claimKey => '$_legacyKey.claimed-by';
   String _owner(String userId) => '$projectHost/$userId';
+  final _recovered = <String>{};
 
-  Future<String?> read(String userId) async =>
-      preferences.getString(keyFor(userId));
+  /// A corrupt or newer-version snapshot is moved aside, never overwritten,
+  /// and the account then opens as new (the cloud copy can be adopted).
+  Future<String?> read(String userId) async {
+    final saved = preferences.getString(keyFor(userId));
+    if (saved == null || canRestoreWellnessState(saved)) return saved;
+    if (!await preferences.setString('${keyFor(userId)}.unreadable', saved)) {
+      throw StateError('Salinan data lama belum dapat diamankan.');
+    }
+    await preferences.remove(keyFor(userId));
+    _recovered.add(userId);
+    return null;
+  }
+
+  /// Whether [read] set aside an unreadable snapshot; reported only once.
+  bool takeRecovered(String userId) => _recovered.remove(userId);
   Future<void> write(String userId, String state) async {
     if (!await preferences.setString(keyFor(userId), state)) {
       throw StateError('Progres akun belum tersimpan di perangkat.');
@@ -75,6 +90,37 @@ class AccountCache {
           : null;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Declining still records who decided, so another account signing in on
+  /// this device is never offered someone else's guest progress.
+  Future<void> declineLegacy(String userId) async {
+    if (!await preferences.setString(_claimKey, _owner(userId))) {
+      throw StateError('Pilihan progres tamu belum tersimpan.');
+    }
+  }
+
+  /// Recovery copies hold the full earlier state, including private reduction
+  /// logs, so a reset removes them. Sync metadata stays for revision checks.
+  Future<void> clearBackups(String userId) async {
+    for (final suffix in ['.before-cloud', '.replaced-cloud', '.unreadable']) {
+      await preferences.remove('${keyFor(userId)}$suffix');
+    }
+  }
+
+  /// Account deletion: every cached copy of this account, plus the guest
+  /// progress this account claimed on this device.
+  Future<void> wipe(String userId) async {
+    final prefix = keyFor(userId);
+    for (final key in preferences.getKeys().toList()) {
+      if (key == prefix || key.startsWith('$prefix.')) {
+        await preferences.remove(key);
+      }
+    }
+    if (preferences.getString(_claimKey) == _owner(userId)) {
+      await preferences.remove(_legacyKey);
+      await preferences.remove(_claimKey);
     }
   }
 

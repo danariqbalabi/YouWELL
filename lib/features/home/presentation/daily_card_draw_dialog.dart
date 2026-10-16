@@ -36,7 +36,7 @@ class _DailyCardDrawDialogState extends State<DailyCardDrawDialog> {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.controller,
     builder: (context, _) {
-      if (widget.controller.wellnessProgramComplete) {
+      if (widget.controller.uatProgramComplete) {
         return AlertDialog(
           title: const Text('Perjalanan 28 hari selesai'),
           content: const Text(
@@ -134,7 +134,7 @@ class _DrawStage extends StatelessWidget {
           ),
           Text(
             mobileExperience
-                ? 'Pilih fokus tambahan hari ini'
+                ? 'Pilih 1 kartu berisi 3–5 misi.'
                 : 'Satu kartu, 3–5 quest. Swipe lalu buka.',
             style: TextStyle(
               color: context.colors.muted,
@@ -163,7 +163,7 @@ class _DrawStage extends StatelessWidget {
                   controller.setDailyPace(values.first),
             ),
           ],
-          if (controller.wellnessUat &&
+          if (controller.uatProgram != null &&
               selected == null &&
               recommended != null) ...[
             const SizedBox(height: 8),
@@ -174,11 +174,6 @@ class _DrawStage extends StatelessWidget {
                 icon: const Icon(Icons.auto_awesome_rounded),
                 label: Text('Buka rekomendasi · ${recommended['size']} misi'),
               ),
-            ),
-            Text(
-              'Sekitar ${recommended['activeMinutes'] ?? recommended['durationMinutes']} menit aktivitas. '
-              'Hidrasi dan istirahat dilakukan sepanjang hari.',
-              style: TextStyle(color: context.colors.muted, fontSize: 12),
             ),
           ],
           const SizedBox(height: 12),
@@ -453,7 +448,7 @@ class _CardBack extends StatelessWidget {
                         'YOUWELL',
                         style: TextStyle(
                           color: palette.ink,
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1.2,
                         ),
@@ -485,7 +480,7 @@ class _CardBack extends StatelessWidget {
                                 : 'KARTU MISI',
                             style: TextStyle(
                               color: palette.ink,
-                              fontSize: 12,
+                              fontSize: 13,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 1.5,
                             ),
@@ -493,13 +488,13 @@ class _CardBack extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             passed
-                                ? 'TIDAK BISA DIPILIH'
+                                ? 'TIDAK DIPILIH'
                                 : centered
-                                ? 'KETUK UNTUK BUKA'
+                                ? 'KETUK KARTU'
                                 : 'GESER KARTU',
                             style: TextStyle(
-                              color: palette.ink.withValues(alpha: .7),
-                              fontSize: 10,
+                              color: palette.ink.withValues(alpha: .85),
+                              fontSize: 12,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -761,7 +756,7 @@ class _CardFront extends StatelessWidget {
                           '+${task['xp']} XP',
                           style: TextStyle(
                             color: context.colors.accent,
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w800,
                           ),
                         ),

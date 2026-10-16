@@ -8,6 +8,7 @@ import 'package:youwell/features/home/domain/quest_ladder.dart';
 import 'package:youwell/features/home/presentation/wellness_program_card.dart';
 import 'package:youwell/features/progress/presentation/journey_rewards.dart';
 import 'package:youwell/shared/widgets/game_widgets.dart';
+import 'package:youwell/features/reduction/presentation/reduction_support_page.dart';
 
 class ProgressPage extends StatelessWidget {
   const ProgressPage({super.key, required this.controller});
@@ -17,7 +18,6 @@ class ProgressPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
-    final kind = controller.profile?['companion']?.toString() ?? 'plant';
     final level = controller.level;
 
     final badges = visibleBadges(controller).toList();
@@ -36,7 +36,7 @@ class ProgressPage extends StatelessWidget {
           style: TextStyle(color: c.muted),
         ),
         const SizedBox(height: 16),
-        if (controller.wellnessUat) ...[
+        if (controller.uatProgram != null) ...[
           WellnessProgramCard(controller: controller),
           const SizedBox(height: 14),
         ],
@@ -52,7 +52,7 @@ class ProgressPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          companionStageName(kind, companionStage(level)),
+                          companionStageName(companionStage(level)),
                           style: text.titleLarge,
                         ),
                         Text(
@@ -123,7 +123,7 @@ class ProgressPage extends StatelessWidget {
               ),
               for (final category in ladderCategories(
                 reduction: controller.reduction,
-              ))
+              ).where((category) => category != 'Reduction'))
                 _LadderRow(
                   category: category,
                   entry: controller.capacity[category],
@@ -144,17 +144,17 @@ class ProgressPage extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _Stat(
-                        icon: Icons.hourglass_bottom_rounded,
-                        value: '${controller.totalDelayMinutes}',
-                        label: 'menit ditunda',
+                        icon: Icons.swap_horiz_rounded,
+                        value: '${controller.habitSwaps.length}',
+                        label: 'Total catatan momen',
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _Stat(
                         icon: Icons.date_range_rounded,
-                        value: '${_delayedMinutesThisWeek()}',
-                        label: 'menit, 7 hari',
+                        value: '${_habitSwapsThisWeek()}',
+                        label: 'Catatan, 7 hari',
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -162,10 +162,15 @@ class ProgressPage extends StatelessWidget {
                       child: _Stat(
                         icon: Icons.swap_horiz_rounded,
                         value: '${controller.habitSwapsToday}',
-                        label: 'Habit Swap hari ini',
+                        label: 'Catatan hari ini',
                       ),
                     ),
                   ],
+                ),
+                TextButton(
+                  onPressed: () =>
+                      openReductionSupport(context, controller, initialTab: 2),
+                  child: const Text('Lihat konsumsi & hasil momen'),
                 ),
               ],
             ),
@@ -175,15 +180,12 @@ class ProgressPage extends StatelessWidget {
     );
   }
 
-  /// Full and partial delays both count: every minute delayed is progress.
-  int _delayedMinutesThisWeek() {
-    final from = dayKey(controller.now.subtract(const Duration(days: 6)));
-    return controller.habitDelays
-        .where((row) => row['day'].toString().compareTo(from) >= 0)
-        .fold<int>(
-          0,
-          (sum, row) => sum + ((row['minutes'] as num?)?.toInt() ?? 0),
-        );
+  int _habitSwapsThisWeek() {
+    final from = shiftDayKey(controller.today, -6);
+    return controller.habitSwaps.where((row) {
+      final day = row['day'].toString();
+      return day.compareTo(from) >= 0 && day.compareTo(controller.today) <= 0;
+    }).length;
   }
 }
 

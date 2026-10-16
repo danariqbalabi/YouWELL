@@ -37,6 +37,18 @@ abstract final class CloudProgress {
     'participant_code',
     'access_token',
     'refresh_token',
+    // Raw smoking/vaping data stays on the device (CLAUDE.md §6).
+    'product',
+    'trigger',
+    'outcome',
+    'activity',
+    'eventId',
+    'cigarette',
+    'vape',
+    'nicotineDays',
+    'reductionSettings',
+    'reductionPlans',
+    'reductionTargets',
   };
 
   static JsonMap _pick(Map source, List<String> keys) => {
@@ -106,9 +118,10 @@ abstract final class CloudProgress {
             'completed',
           ]),
       ],
+      // Counts per day only: moment times would be a craving-frequency log.
       'habitSwaps': [
         for (final row in (source['habitSwaps'] as List).whereType<Map>())
-          _pick(row, ['id', 'day', 'time']),
+          _pick(row, ['id', 'day']),
       ],
     };
   }
@@ -138,7 +151,20 @@ abstract final class CloudProgress {
             ...row,
             if (collection == 'habitSwaps') 'swap': 'Aktivitas pengganti',
             if (originals[row['id']] case final original?)
-              ..._pick(original, ['photoPath', 'note', 'noteEditedAt', 'swap']),
+              ..._pick(original, [
+                'photoPath',
+                'note',
+                'noteEditedAt',
+                if (collection == 'habitSwaps') ...[
+                  'time',
+                  'eventId',
+                  'product',
+                  'trigger',
+                  'activity',
+                  'outcome',
+                  'swap',
+                ],
+              ]),
           },
       ];
     }

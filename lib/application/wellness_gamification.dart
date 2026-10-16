@@ -24,10 +24,6 @@ extension MobileWellnessRewards on WellnessController {
       _data['companionBackground']?.toString() ?? 'natural';
   Map<String, dynamic> get achievements =>
       Map<String, dynamic>.from(_data['achievements'] ?? {});
-  int get totalDelayMinutes => habitDelays.fold(
-    0,
-    (sum, row) => sum + max(0, (row['minutes'] as num?)?.toInt() ?? 0),
-  );
   int get mobileBonusXp =>
       ((_data['mobileRewards'] ?? {}) as Map).values.fold<int>(
         0,
@@ -69,7 +65,7 @@ extension MobileWellnessRewards on WellnessController {
   }
 
   bool setDailyPace(String value) {
-    if (wellnessProgramComplete) return false;
+    if (uatProgramComplete) return false;
     if (!const ['relaxed', 'normal'].contains(value) ||
         hasCommittedDailyCard ||
         selectedDailyCardId != null ||
@@ -83,9 +79,10 @@ extension MobileWellnessRewards on WellnessController {
     return true;
   }
 
-  void _markActivity() {
+  void _markActivity([String? day]) {
     final rows = (_data['activityDays'] ??= <dynamic>[]) as List;
-    if (!rows.contains(today)) rows.add(today);
+    final key = day ?? today;
+    if (!rows.contains(key)) rows.add(key);
   }
 
   List<String> _claimAchievements() {
@@ -103,10 +100,6 @@ extension MobileWellnessRewards on WellnessController {
       'first-quest': activeDays.isNotEmpty,
       'full-day': completedDays.isNotEmpty,
       'weekly-rhythm': activeDaysIn(7) >= 4,
-      'first-delay': habitDelays.any((row) => row['completed'] != false),
-      'delay-30': totalDelayMinutes >= 30,
-      'delay-60': totalDelayMinutes >= 60,
-      'delay-300': totalDelayMinutes >= 300,
       'hydration-7': hydrationDays >= 7,
       'first-ladder': capacity.values.any((row) => row['acceptedOn'] != null),
     };
@@ -119,14 +112,21 @@ extension MobileWellnessRewards on WellnessController {
     return earned;
   }
 
-  void _rewardCompletions(List<JsonMap> before) {
+  /// [day] defaults to today; a walk finished after midnight rewards the day
+  /// it started on, including that day's one-time full-day bonus.
+  void _rewardCompletions(List<JsonMap> before, {String? day}) {
     if (!_mobileRewardsEnabled) return;
+    final key = day ?? today;
+    final dayQuests = _questsOn(key);
     final previousDone = before
         .where((row) => row['status'] == 'completed')
         .map((row) => row['id'])
         .toSet();
-    final newDone = completedCards
-        .where((row) => !previousDone.contains(row['id']))
+    final newDone = dayQuests
+        .where(
+          (row) =>
+              row['status'] == 'completed' && !previousDone.contains(row['id']),
+        )
         .toList();
     if (newDone.isEmpty) return;
     final rewards = (_data['mobileRewards'] ??= <String, dynamic>{}) as Map;
@@ -135,16 +135,17 @@ extension MobileWellnessRewards on WellnessController {
       final id = 'quest:${task['id']}';
       if (rewards.containsKey(id)) continue;
       final amount = (task['xp'] as num?)?.toInt() ?? 15;
-      rewards[id] = {'day': today, 'questXp': amount};
+      rewards[id] = {'day': key, 'questXp': amount};
       gained += amount;
     }
     if (gained == 0) return;
     final oldLevel = max(levelFloor, levelForXp(xp - gained));
     var full = false;
-    if (coreQuests.length >= 3 &&
-        coreQuests.every((task) => task['status'] == 'completed') &&
-        !rewards.containsKey('day:$today')) {
-      rewards['day:$today'] = {'day': today, 'bonusXp': 20};
+    final core = dayQuests.where((task) => task['bonus'] != true).toList();
+    if (core.length >= 3 &&
+        core.every((task) => task['status'] == 'completed') &&
+        !rewards.containsKey('day:$key')) {
+      rewards['day:$key'] = {'day': key, 'bonusXp': 20};
       gained += 20;
       full = true;
     }

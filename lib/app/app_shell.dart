@@ -25,6 +25,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _tab = 0;
   bool _drawing = false;
+  bool _drawDeferred = false;
   late String _day = widget.controller.today;
   Timer? _dayWatcher;
   final _companionTarget = GlobalKey();
@@ -37,7 +38,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) => _startDay());
     // Catch midnight while the app stays open in the foreground.
     _dayWatcher = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (widget.controller.today != _day) _startDay();
+      if (widget.controller.today != _day) {
+        _startDay();
+      } else if (_drawDeferred) {
+        _openDailyDraw();
+      }
     });
   }
 
@@ -62,6 +67,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   Future<void> _openDailyDraw() async {
     if (!mounted || _drawing || !widget.controller.needsDailyCardDraw) return;
+    // Never cover a pushed page, e.g. a walk that runs past midnight.
+    _drawDeferred = ModalRoute.of(context)?.isCurrent == false;
+    if (_drawDeferred) return;
     _drawing = true;
     await showDialog<void>(
       context: context,
@@ -76,8 +84,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   void _openProfile() => Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) =>
-          ProfilePage(controller: widget.controller, mobileExperience: true),
+      builder: (_) => ProfilePage(controller: widget.controller),
     ),
   );
 
@@ -117,6 +124,20 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             children: [
               if (AccountScope.maybeOf(context) case final account?)
                 ProgressSyncPanel(auth: account, compact: true),
+              if (widget.controller.storageError case final error?)
+                MaterialBanner(
+                  content: Text(error),
+                  leading: Icon(
+                    Icons.warning_amber_rounded,
+                    color: context.colors.amber,
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: widget.controller.dismissStorageError,
+                      child: const Text('Mengerti'),
+                    ),
+                  ],
+                ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 10, 12, 8),
                 child: Row(

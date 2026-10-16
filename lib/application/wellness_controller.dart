@@ -14,9 +14,13 @@ import 'package:youwell/features/home/domain/quest_ladder.dart';
 import 'package:youwell/features/home/domain/wellness_uat_program.dart';
 import 'package:youwell/features/progress/domain/level_curve.dart';
 import 'package:youwell/features/progress/domain/research_summary.dart';
+import 'package:youwell/features/reduction/domain/reduction_policy.dart';
 import 'package:youwell/features/companion/domain/companion_rewards.dart';
+import 'package:youwell/features/community/domain/community_store.dart'
+    show maxCommunityPostLength;
 
 part 'wellness_gamification.dart';
+part 'wellness_reduction.dart';
 
 /// Single local-first state boundary shared by mobile and web.
 /// Remote auth and sync can later replace [persist] without changing the UI.
@@ -30,7 +34,7 @@ class WellnessController extends ChangeNotifier {
     if (saved != null) {
       try {
         _data = restoreWellnessState(saved);
-        if (wellnessUat &&
+        if (profile != null &&
             DateTime.tryParse(profile?['started']?.toString() ?? '') == null) {
           _data['profile']['started'] = today;
         }
@@ -39,9 +43,9 @@ class WellnessController extends ChangeNotifier {
           _data['levelFloor'] = legacyLevelForXp(xp);
         }
       } catch (_) {
-        storageError =
-            'Preview lokal lama direset untuk memakai versi terbaru.';
+        storageError = 'Data lokal tidak bisa dibaca, jadi aplikasi mulai baru.';
       }
+      _replaceRetiredDelayQuests();
       _reconcileActivityEvidence();
       _refreshPendingLadderOffers();
     }
@@ -66,6 +70,11 @@ class WellnessController extends ChangeNotifier {
     super.dispose();
   }
 
+  void dismissStorageError() {
+    storageError = null;
+    if (!_disposed) notifyListeners();
+  }
+
   String get themePreference => _data['themeMode']?.toString() ?? 'system';
 
   Future<void> setThemePreference(String value) {
@@ -84,17 +93,19 @@ class WellnessController extends ChangeNotifier {
       : Map<String, dynamic>.from(_data['profile']);
   bool get reduction => profile?['path'] == 'reduction';
   bool get wellnessUat => profile?['path'] == 'wellness';
-  WellnessUatProgram? get wellnessProgram => wellnessUat
+  WellnessUatProgram? get uatProgram => profile != null
       ? WellnessUatProgram(
           started: profile?['started']?.toString() ?? today,
           now: now,
         )
       : null;
+  WellnessUatProgram? get wellnessProgram => wellnessUat ? uatProgram : null;
   bool get wellnessProgramComplete => wellnessProgram?.complete == true;
+  bool get uatProgramComplete => uatProgram?.complete == true;
   int ladderMaximum(String category) => ladderMax(
     category,
     lowImpact: profile?['lowImpact'] == true,
-    wellnessUat: wellnessUat,
+    wellnessUat: profile != null,
   );
 
   /// Under 21 the reduction path speaks about quitting (PP 28/2024 Ps. 434).
@@ -111,10 +122,12 @@ class WellnessController extends ChangeNotifier {
       .map((row) => Map<String, dynamic>.from(row))
       .toList();
 
-  List<JsonMap> get quests => ((days[today]?['quests'] ?? const []) as List)
-      .whereType<Map>()
-      .map((task) => Map<String, dynamic>.from(task))
-      .toList();
+  List<JsonMap> get quests => _questsOn(today);
+  List<JsonMap> _questsOn(String day) =>
+      ((days[day]?['quests'] ?? const []) as List)
+          .whereType<Map>()
+          .map((task) => Map<String, dynamic>.from(task))
+          .toList();
   List<JsonMap> get dailyDrawCards =>
       ((days[today]?['cardPacks'] ?? days[today]?['bonusCards'] ?? const [])
               as List)
@@ -156,7 +169,7 @@ class WellnessController extends ChangeNotifier {
       .firstOrNull;
 
   bool chooseRecommendedDailyCard() {
-    if (!wellnessUat || wellnessProgramComplete) return false;
+    if (profile == null || uatProgramComplete) return false;
     prepareToday();
     final card = recommendedDailyCard;
     return card != null && selectDailyCard(card['id'].toString());
@@ -164,7 +177,7 @@ class WellnessController extends ChangeNotifier {
 
   bool get hasCommittedDailyCard => dailyCardDraw?['committedCardId'] != null;
   bool get needsDailyCardDraw =>
-      profile != null && !wellnessProgramComplete && !hasCommittedDailyCard;
+      profile != null && !uatProgramComplete && !hasCommittedDailyCard;
   int get dailyCardSwitchesRemaining =>
       (1 - passedDailyCardIds.length).clamp(0, 1);
   bool get canChooseAnotherDailyCard =>
@@ -187,9 +200,7 @@ class WellnessController extends ChangeNotifier {
 
   /// One optional Kartu Bonus per day, offered after a full day.
   bool get canDrawBonusCard =>
-      !wellnessProgramComplete &&
-      coreComplete &&
-      days[today]?['bonusDrawn'] != true;
+      !uatProgramComplete && coreComplete && days[today]?['bonusDrawn'] != true;
 
   bool drawBonusCard() {
     if (!canDrawBonusCard) return false;
@@ -201,7 +212,7 @@ class WellnessController extends ChangeNotifier {
       hasWaterLadder: quests.any((task) => task['activityKind'] == 'water'),
       hasFoodLadder: quests.any((task) => task['ladder'] == 'Food'),
       hour: now.hour,
-      wellnessUat: wellnessUat,
+      wellnessUat: profile != null,
     );
     _data['days'][today]['quests'] = [
       ...quests,
@@ -245,6 +256,8 @@ class WellnessController extends ChangeNotifier {
 
   // Focus belongs to the web Pomodoro. Mobile does not expose this collection.
   List<JsonMap> get focusSessions => _rows('focusSessions');
+
+  /// Archived timer records, retained only for old exports/research summaries.
   List<JsonMap> get habitDelays => _rows('habitDelays');
   List<JsonMap> get habitSwaps => _rows('habitSwaps');
   List<JsonMap> get workoutSessions => _rows('workoutSessions');
@@ -267,10 +280,6 @@ class WellnessController extends ChangeNotifier {
         (sum, row) => sum + ((row['minutes'] as num?)?.toInt() ?? 0),
       );
 
-  /// Only full timers count as a finished delay; partial ones stay in the log.
-  int get delayedToday => habitDelays
-      .where((row) => row['day'] == today && row['completed'] != false)
-      .length;
   int get habitSwapsToday =>
       habitSwaps.where((row) => row['day'] == today).length;
   List<String> get openedDays =>
@@ -281,11 +290,17 @@ class WellnessController extends ChangeNotifier {
     for (final entry in ((_data['capacity'] ?? const {}) as Map).entries)
       entry.key.toString(): Map<String, dynamic>.from(entry.value as Map),
   };
-  Map<String, int> get ladderSteps => {
-    for (final entry in capacity.entries)
-      entry.key: (entry.value['step'] as num?)?.toInt() ?? 1,
-  };
-  List<String> get ladderOffers => wellnessProgramComplete
+  /// Steps of the active path only: a category left behind by a path switch
+  /// keeps its saved step but is reported as unused (null) in research logs.
+  Map<String, int> get ladderSteps {
+    final active = ladderCategories(reduction: reduction);
+    return {
+      for (final entry in capacity.entries)
+        if (active.contains(entry.key))
+          entry.key: (entry.value['step'] as num?)?.toInt() ?? 1,
+    };
+  }
+  List<String> get ladderOffers => uatProgramComplete
       ? []
       : [
           for (final category in ladderCategories(reduction: reduction))
@@ -356,6 +371,10 @@ class WellnessController extends ChangeNotifier {
       'started': profile?['started'] ?? today,
       'waterGoal': value['waterGoal'] ?? profile?['waterGoal'] ?? 2000,
     };
+    final product = _data['profile'].remove('nicotineProduct');
+    if (reduction && nicotineProductLabels.containsKey(product)) {
+      _data['reductionSettings'] = {'product': product};
+    }
     prepareToday();
     await _save();
   }
@@ -365,7 +384,7 @@ class WellnessController extends ChangeNotifier {
     final opened = (_data['openedDays'] ??= <dynamic>[]) as List;
     final firstOpenToday = !opened.contains(today);
     if (firstOpenToday) opened.add(today);
-    if (wellnessProgramComplete) {
+    if (uatProgramComplete) {
       if (firstOpenToday) _save();
       return;
     }
@@ -419,13 +438,13 @@ class WellnessController extends ChangeNotifier {
     cameraAvailable: !cameraUnavailable,
     hour: now.hour,
     timedWorkouts: timedWorkouts,
-    wellnessUat: wellnessUat,
+    wellnessUat: profile != null,
     recentAttempts: {
       for (final category in ladderCategories(reduction: reduction))
         category: _ladderQuestsBefore(
           category,
           7,
-          includePractice: wellnessUat,
+          includePractice: profile != null,
         ).map((task) => task['day']).toSet().length,
     },
     lowImpact: profile?['lowImpact'] == true,
@@ -434,16 +453,14 @@ class WellnessController extends ChangeNotifier {
 
   /// Rebuilds today's untouched cards after a ladder or path change.
   void _refreshDraft() {
-    if (days[today] == null ||
-        hasCommittedDailyCard ||
-        wellnessProgramComplete) {
+    if (days[today] == null || hasCommittedDailyCard || uatProgramComplete) {
       return;
     }
     _data['days'][today]['cardPacks'] = _cardPacks();
   }
 
   bool _refreshMealDraft() {
-    if (!wellnessUat || hasCommittedDailyCard || wellnessProgramComplete) {
+    if (profile == null || hasCommittedDailyCard || uatProgramComplete) {
       return false;
     }
     final cards = dailyDrawCards;
@@ -511,8 +528,86 @@ class WellnessController extends ChangeNotifier {
     _rewardCompletions(before);
   }
 
+  /// Retire old timer drafts/open quests without rewriting completed history
+  /// or earned XP. The category key stays compatible with saved snapshots.
+  void _replaceRetiredDelayQuests() {
+    JsonMap replace(Map raw) {
+      final task = Map<String, dynamic>.from(raw);
+      if (task['status'] == 'completed' ||
+          (task['activityKind'] != 'delay' &&
+              task['delayMinutes'] == null &&
+              !(task['ladder'] == 'Reduction' &&
+                  task['activityKind'] != 'habit_swap'))) {
+        return task;
+      }
+      final rung = ladders['Reduction']!.first;
+      return {
+        ...task
+          ..remove('delayMinutes')
+          ..remove('partial')
+          ..remove('validationInvalidated'),
+        'title': rung.title,
+        'description': rung.description,
+        'category': 'Reduction',
+        'activityKind': 'habit_swap',
+        'durationMinutes': rung.durationMinutes,
+        'difficulty': 1,
+        if (task['ladder'] == 'Reduction') 'step': 1,
+      };
+    }
+
+    JsonMap replaceCard(Map card) {
+      if (card['tasks'] is! List) return replace(card);
+      final tasks = [
+        for (final task in (card['tasks'] as List).whereType<Map>())
+          replace(task),
+      ];
+      return {
+        ...card,
+        'tasks': tasks,
+        if (card['categories'] is List)
+          'title': (card['categories'] as List)
+              .map((category) => ladderLabels[category] ?? category)
+              .join(' · '),
+        'durationMinutes': tasks.fold<int>(
+          0,
+          (sum, task) =>
+              sum + ((task['durationMinutes'] as num?)?.toInt() ?? 0),
+        ),
+      };
+    }
+
+    for (final entry in (_data['days'] as Map).entries) {
+      if (entry.key.toString().compareTo(today) < 0 || entry.value is! Map) {
+        continue;
+      }
+      final day = entry.value as Map;
+      day['quests'] = [
+        for (final task in (day['quests'] ?? const []) as List)
+          if (task is Map) replace(task),
+      ];
+      for (final key in ['cardPacks', 'bonusCards']) {
+        if (day[key] is! List) continue;
+        day[key] = [
+          for (final card in (day[key] as List).whereType<Map>())
+            replaceCard(card),
+        ];
+      }
+    }
+    final entry = (_data['capacity'] as Map?)?['Reduction'];
+    if (entry is Map && (entry['step'] != 1 || entry['offerStep'] != null)) {
+      entry
+        ..remove('offerStep')
+        ..remove('acceptedOn')
+        ..['step'] = 1
+        ..['reviewedOn'] = today
+        ..['change'] = 'hold'
+        ..['reason'] = 'Habit Swap mengikuti aktivitas yang kamu pilih.';
+    }
+  }
+
   void _reviewLadders() {
-    if (wellnessProgramComplete) return;
+    if (uatProgramComplete) return;
     _reconcileActivityEvidence();
     final ladderState = (_data['capacity'] ??= <String, dynamic>{}) as Map;
     final pace = (profile?['pace'] as num?)?.toInt() ?? 1;
@@ -522,7 +617,7 @@ class WellnessController extends ChangeNotifier {
       final maxStep = ladderMax(
         category,
         lowImpact: lowImpact,
-        wellnessUat: wellnessUat,
+        wellnessUat: profile != null,
       );
       final entry = ladderState[category];
       if (entry is! Map) {
@@ -535,15 +630,24 @@ class WellnessController extends ChangeNotifier {
         };
         continue;
       }
-      if (wellnessUat && ((entry['step'] as num?)?.toInt() ?? 1) > maxStep) {
+      if (profile != null &&
+          ((entry['step'] as num?)?.toInt() ?? 1) > maxStep) {
         entry['step'] = maxStep;
         entry.remove('offerStep');
         entry['reviewedOn'] = today;
         entry['reason'] =
             'Latihan disesuaikan dengan batas perjalanan 28 hari.';
       }
+      // A clock set forward and back must not freeze reviews for days.
+      if (_daysBetween(entry['reviewedOn'].toString(), today) < 0) {
+        entry['reviewedOn'] = today;
+      }
       final since = _daysBetween(entry['reviewedOn'].toString(), today);
-      if (since < 7 && !(inactive >= 5 && since >= 5)) continue;
+      // The early welcome-back happens once; further quiet weeks keep the
+      // regular 7-day cadence (CHALLENGE_SPEC §8).
+      final welcomeBack =
+          inactive >= 5 && since >= 5 && entry['change'] != 'rest';
+      if (since < 7 && !welcomeBack) continue;
       final current = ((entry['step'] as num?)?.toInt() ?? 1).clamp(1, maxStep);
       final review = reviewLadder(
         category: category,
@@ -552,13 +656,13 @@ class WellnessController extends ChangeNotifier {
         weekQuests: _ladderQuestsBefore(
           category,
           7,
-          step: wellnessUat ? current : null,
+          step: profile != null ? current : null,
         ),
         inactiveDays: inactive,
       );
       final offered = review.change == 'up';
       ladderState[category] = {
-        if (wellnessUat) ...entry,
+        if (profile != null) ...entry,
         'step': offered ? current : review.step,
         'reviewedOn': today,
         'change': review.change,
@@ -579,7 +683,7 @@ class WellnessController extends ChangeNotifier {
     bool includePractice = false,
   }) {
     final end = before ?? today;
-    final start = dayKey(DateTime.parse(end).subtract(Duration(days: period)));
+    final start = shiftDayKey(end, -period);
     return [
       for (final entry in days.entries)
         if (entry.key.compareTo(start) >= 0 && entry.key.compareTo(end) < 0)
@@ -602,12 +706,11 @@ class WellnessController extends ChangeNotifier {
     return _daysBetween(before.last, today) - 1;
   }
 
-  int _daysBetween(String from, String to) =>
-      DateTime.parse(to).difference(DateTime.parse(from)).inDays;
+  int _daysBetween(String from, String to) => daysBetweenKeys(from, to);
 
   void acceptLadderStep(String category) {
-    if (wellnessProgramComplete) return;
-    if (wellnessUat) _refreshPendingLadderOffers();
+    if (uatProgramComplete) return;
+    if (profile != null) _refreshPendingLadderOffers();
     final entry = capacity[category];
     final offer = (entry?['offerStep'] as num?)?.toInt();
     if (entry == null || offer == null) return;
@@ -617,7 +720,7 @@ class WellnessController extends ChangeNotifier {
       'change': 'up',
       'acceptedOn': today,
       // Start a fresh evidence week at acceptance, including late acceptance.
-      if (wellnessUat) 'reviewedOn': today,
+      if (profile != null) 'reviewedOn': today,
     };
     if (_mobileRewardsEnabled) {
       _moments.add(
@@ -647,8 +750,8 @@ class WellnessController extends ChangeNotifier {
   void drawDailyCards() => prepareToday();
 
   bool selectDailyCard(String id) {
-    if (wellnessProgramComplete) return false;
-    if (wellnessUat) prepareToday();
+    if (uatProgramComplete) return false;
+    if (profile != null) prepareToday();
     if (hasCommittedDailyCard ||
         passedDailyCardIds.contains(id) ||
         !dailyDrawCards.any((card) => card['id'] == id)) {
@@ -659,7 +762,7 @@ class WellnessController extends ChangeNotifier {
   }
 
   bool chooseAnotherDailyCard() {
-    if (wellnessProgramComplete) return false;
+    if (uatProgramComplete) return false;
     if (!canChooseAnotherDailyCard) return false;
     final passed = [...passedDailyCardIds, selectedDailyCardId!];
     final choices = dailyDrawCards
@@ -680,7 +783,7 @@ class WellnessController extends ChangeNotifier {
   }
 
   bool commitDailyCardPack() {
-    if (wellnessProgramComplete) return false;
+    if (uatProgramComplete) return false;
     final beforeRefresh = selectedDailyCard;
     final mealRefreshed = _refreshMealDraft();
     if (mealRefreshed &&
@@ -710,7 +813,8 @@ class WellnessController extends ChangeNotifier {
       ...?dailyCardDraw,
       'committedCardId': card['id'],
     };
-    if (wellnessUat) _applyRecordedWellnessEvidence();
+    if (profile != null) _applyRecordedWellnessEvidence();
+    if (reduction) _applyHabitSwapEvidence();
     _save();
     return true;
   }
@@ -721,7 +825,7 @@ class WellnessController extends ChangeNotifier {
   }
 
   bool completeCard(String id) {
-    if (wellnessProgramComplete) return false;
+    if (uatProgramComplete) return false;
     final tasks = quests;
     final before = quests;
     final index = tasks.indexWhere((task) => task['id'] == id);
@@ -735,7 +839,7 @@ class WellnessController extends ChangeNotifier {
   }
 
   void addWater() {
-    if (wellnessProgramComplete) return;
+    if (uatProgramComplete) return;
     prepareToday();
     _markActivity();
     _data['days'][today]['water'] = (water + 250).clamp(0, 4000);
@@ -748,14 +852,44 @@ class WellnessController extends ChangeNotifier {
     _save();
   }
 
+  /// An unfinished walk/run (kind, banked seconds, start, meters, heartbeat)
+  /// kept on this device only, so closing the app does not lose the session.
+  JsonMap? get workoutDraft => _data['workoutDraft'] is Map
+      ? Map<String, dynamic>.from(_data['workoutDraft'])
+      : null;
+
+  void saveWorkoutDraft(JsonMap? draft) {
+    if (draft == null && _data['workoutDraft'] == null) return;
+    _data['workoutDraft'] = draft;
+    _save();
+  }
+
   /// Logs only meters and seconds, then checks walk/run quests against them.
+  /// [startedOn] is the day the session began: a walk that runs past
+  /// midnight counts for that day's card, not the new day's.
   WorkoutResult recordWorkout({
     required String kind,
     required int seconds,
     required int meters,
+    String? startedOn,
   }) {
-    if (wellnessProgramComplete) return const WorkoutResult();
+    final day =
+        startedOn != null &&
+            DateTime.tryParse(startedOn) != null &&
+            startedOn.compareTo(today) < 0
+        ? startedOn
+        : today;
+    final programEnded = day == today
+        ? uatProgramComplete
+        : profile == null ||
+              WellnessUatProgram(
+                started: profile?['started']?.toString() ?? day,
+                now: DateTime.parse(day),
+              ).complete;
+    if (programEnded) return const WorkoutResult();
     if (seconds < 1) return const WorkoutResult();
+    // Just after midnight the day may not exist until the next tick.
+    prepareToday();
     final kmPerHour = meters / seconds * 3.6;
     final tooFast = kmPerHour > maxWalkRunKmPerHour;
     _add('workoutSessions', {
@@ -763,11 +897,11 @@ class WellnessController extends ChangeNotifier {
       'seconds': seconds,
       'meters': meters,
       if (tooFast) 'countsForQuest': false,
-    });
+    }, day: day);
     if (tooFast) return const WorkoutResult(tooFast: true);
     final completed = <String>[], partial = <String>[];
-    final before = quests;
-    final tasks = quests;
+    final before = _questsOn(day);
+    final tasks = _questsOn(day);
     for (final (index, task) in tasks.indexed) {
       if (task['status'] == 'completed' &&
           task['validationInvalidated'] != true) {
@@ -781,7 +915,7 @@ class WellnessController extends ChangeNotifier {
       final ratio = ActivityEvidence.workoutProgress(
         task,
         workoutSessions,
-        today,
+        day,
       );
       if (ratio >= 1) {
         completed.add(task['title'].toString());
@@ -801,8 +935,8 @@ class WellnessController extends ChangeNotifier {
         };
       }
     }
-    _data['days'][today]['quests'] = tasks;
-    _rewardCompletions(before);
+    if (days[day] is Map) _data['days'][day]['quests'] = tasks;
+    _rewardCompletions(before, day: day);
     _save();
     return WorkoutResult(completed: completed, partial: partial);
   }
@@ -812,9 +946,10 @@ class WellnessController extends ChangeNotifier {
     bool photoCaptured = false,
     String note = '',
   }) {
-    if (wellnessProgramComplete) return;
+    if (uatProgramComplete) return;
     final hasPhotoEvidence = photoPath != null || photoCaptured;
     if (!hasPhotoEvidence && note.trim().isEmpty) return;
+    prepareToday();
     _add('mealCheckIns', {
       if (photoPath != null) 'photoPath': photoPath,
       if (hasPhotoEvidence) 'photoCaptured': true,
@@ -857,26 +992,6 @@ class WellnessController extends ChangeNotifier {
 
   void recordFocusSession(JsonMap value) => _add('focusSessions', value);
 
-  /// A stopped timer is logged as "ditunda X menit", never as a miss.
-  void recordHabitDelay({
-    int minutes = 5,
-    int plannedMinutes = 5,
-    bool completed = true,
-  }) {
-    _add('habitDelays', {
-      'minutes': minutes,
-      'plannedMinutes': plannedMinutes,
-      'completed': completed,
-    });
-    if (completed) {
-      _completeWhere(
-        (task) =>
-            task['activityKind'] == 'delay' &&
-            plannedMinutes >= ((task['delayMinutes'] as num?)?.toInt() ?? 5),
-      );
-    }
-  }
-
   bool get cameraUnavailable => _data['cameraUnavailable'] == true;
 
   /// Camera denied or missing: photo quests become check-off equivalents,
@@ -902,36 +1017,6 @@ class WellnessController extends ChangeNotifier {
     }
     _refreshDraft();
     _save();
-  }
-
-  /// Minutes until another Habit Swap can be logged (one per craving moment).
-  int get habitSwapCooldownMinutes {
-    if (habitSwaps.isEmpty) return 0;
-    final last = DateTime.tryParse(habitSwaps.last['time'].toString());
-    if (last == null) return 0;
-    final left = habitSwapCooldown - now.difference(last);
-    return left.inMicroseconds <= 0
-        ? 0
-        : (left.inMicroseconds / Duration.microsecondsPerMinute).ceil();
-  }
-
-  /// Habit Swap stays self-reported; logging one also ticks its quest.
-  bool recordHabitSwap(String swap) {
-    if (habitSwapCooldownMinutes > 0) return false;
-    _add('habitSwaps', {'swap': swap});
-    _completeWhere((task) => task['activityKind'] == 'habit_swap');
-    return true;
-  }
-
-  /// Minutes of the Delay Craving timer for today's ladder quest.
-  int get delayTargetMinutes {
-    for (final task in quests) {
-      if (task['activityKind'] == 'delay' && task['status'] != 'completed') {
-        return (task['delayMinutes'] as num?)?.toInt() ?? 5;
-      }
-    }
-    final step = ladderSteps['Reduction'] ?? 2;
-    return ladders['Reduction']![(step - 1).clamp(0, 3)].delayMinutes ?? 5;
   }
 
   void _completeWhere(bool Function(JsonMap task) test) {
@@ -994,6 +1079,14 @@ class WellnessController extends ChangeNotifier {
     _save();
   }
 
+  /// Sets or clears (null) this device's single reaction on a post.
+  void setCommunityReaction(String postId, String? reaction) {
+    final rows = _data['communityReactions'] as List;
+    rows.removeWhere((row) => row['postId'] == postId);
+    if (reaction != null) rows.add({'postId': postId, 'reaction': reaction});
+    _save();
+  }
+
   bool hasReportedCommunityPost(String postId) =>
       communityReports.any((report) => report['postId'] == postId);
 
@@ -1009,11 +1102,11 @@ class WellnessController extends ChangeNotifier {
     _save();
   }
 
-  void _add(String key, JsonMap value) {
+  void _add(String key, JsonMap value, {String? day}) {
     (_data[key] as List).add({
       ...value,
       'id': '${now.microsecondsSinceEpoch}-${Random().nextInt(9999)}',
-      'day': today,
+      'day': day ?? today,
       'time': now.toIso8601String(),
     });
     if (const {
@@ -1023,7 +1116,7 @@ class WellnessController extends ChangeNotifier {
       'workoutSessions',
       'mealCheckIns',
     }.contains(key)) {
-      _markActivity();
+      _markActivity(day);
       if (_mobileRewardsEnabled) {
         final badges = _claimAchievements();
         if (badges.isNotEmpty) {
@@ -1077,6 +1170,40 @@ class WellnessController extends ChangeNotifier {
     _data['researchParticipation'] = consent
         ? {'code': code, 'consentedOn': today}
         : null;
+    // A new consent (or code) starts its own delivery record.
+    _data.remove('researchSent');
+    _save();
+  }
+
+  bool researchWeekComplete(int week) =>
+      daysBetweenKeys(profile?['started']?.toString() ?? today, today) >=
+      7 * week;
+
+  /// Weeks to send: each started week once a day while it runs, and once more
+  /// when it is complete. Analysts keep the latest row per code and week.
+  List<int> get researchWeeksDue {
+    final program = uatProgram;
+    if (researchParticipation == null || program == null) return const [];
+    final sent = (_data['researchSent'] as Map?) ?? const {};
+    bool due(int week) {
+      final mark = sent['$week'];
+      if (mark is! Map) return true;
+      if (mark['complete'] == true) return false;
+      return mark['day'] != today || researchWeekComplete(week);
+    }
+
+    final last = program.complete ? 4 : program.week;
+    return [
+      for (var week = 1; week <= last; week++)
+        if (due(week)) week,
+    ];
+  }
+
+  void markResearchSent(int week, {required bool complete}) {
+    (_data['researchSent'] ??= <String, dynamic>{})['$week'] = {
+      'day': today,
+      'complete': complete,
+    };
     _save();
   }
 
@@ -1186,7 +1313,7 @@ class WellnessController extends ChangeNotifier {
           category,
           7,
           before: entry['reviewedOn']?.toString() ?? today,
-          step: wellnessUat ? current : null,
+          step: profile != null ? current : null,
         ),
         inactiveDays: 0,
       );
@@ -1210,13 +1337,11 @@ class WellnessController extends ChangeNotifier {
   }
 }
 
-const maxCommunityPostLength = 280;
 const _photoFreeMealQuest = {
   'catalogId': 'fruit-veg',
   'title': 'Tambahkan buah atau sayur',
   'description': 'Satu porsi di salah satu makanmu hari ini.',
 };
-const habitSwapCooldown = Duration(minutes: 10);
 
 /// Above this average speed a session was most likely in a vehicle.
 const maxWalkRunKmPerHour = 20.0;

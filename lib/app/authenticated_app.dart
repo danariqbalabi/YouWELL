@@ -12,6 +12,8 @@ import 'package:youwell/features/auth/presentation/account_scope.dart';
 import 'package:youwell/features/auth/presentation/auth_page.dart';
 import 'youwell_app.dart';
 import 'package:youwell/features/sync/data/supabase_progress_store.dart';
+import 'package:youwell/features/community/data/supabase_community_store.dart';
+import 'package:youwell/features/progress/data/supabase_research_log_store.dart';
 
 class AuthenticatedApp extends StatefulWidget {
   const AuthenticatedApp({super.key, required this.preferences});
@@ -79,6 +81,13 @@ class _AuthenticatedAppState extends State<AuthenticatedApp>
           url: url.toString(),
           publishableKey: AppEnvironment.supabasePublishableKey,
         ),
+        researchStore: SupabaseResearchLogStore(sdk.client),
+        communityStore: (userId) => SupabaseCommunityStore(
+          client: sdk.client,
+          userId: userId,
+          url: url.toString(),
+          publishableKey: AppEnvironment.supabasePublishableKey,
+        ),
       );
       setState(() => _auth = auth);
       auth.start();
@@ -106,6 +115,7 @@ class _AuthenticatedAppState extends State<AuthenticatedApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_auth?.progress?.syncNow());
+      unawaited(_auth?.submitResearch());
     }
   }
 

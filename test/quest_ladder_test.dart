@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/features/home/domain/quest_ladder.dart';
 
 import 'support/sim.dart';
@@ -88,15 +89,24 @@ void main() {
     expect(sim.controller.ladderSteps['Body'], 2, reason: 'only once');
   });
 
-  test('Habit Swap logs at most once per 10 minutes', () async {
-    final sim = Sim();
-    await sim.start(path: 'reduction');
-    expect(sim.controller.recordHabitSwap('Jalan sebentar'), isTrue);
-    expect(sim.controller.recordHabitSwap('Kabari teman'), isFalse);
-    expect(sim.controller.habitSwapCooldownMinutes, 10);
-    sim.now = sim.now.add(const Duration(minutes: 10));
-    expect(sim.controller.recordHabitSwap('Kabari teman'), isTrue);
-  });
+  test(
+    'Distinct moments need no ten-minute wait; a repeated submission is ignored',
+    () async {
+      final sim = Sim();
+      await sim.start(path: 'reduction');
+      bool record(String id) => sim.controller.recordHabitSwap(
+        eventId: id,
+        product: 'cigarette',
+        trigger: 'after_meal',
+        activity: 'walk',
+        outcome: 'used',
+      );
+      expect(record('first'), isTrue);
+      expect(record('first'), isFalse);
+      expect(record('second'), isTrue);
+      expect(sim.controller.habitSwaps, hasLength(2));
+    },
+  );
 
   test('Water ladder completes from logged glasses', () async {
     final sim = Sim();

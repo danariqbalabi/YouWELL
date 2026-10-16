@@ -31,9 +31,8 @@ class ResearchSummary {
     required List<JsonMap> habitDelays,
     required List<JsonMap> habitSwaps,
   }) {
-    final first = DateTime.parse(started).add(Duration(days: 7 * (week - 1)));
-    final from = dayKey(first);
-    final to = dayKey(first.add(const Duration(days: 6)));
+    final from = shiftDayKey(started, 7 * (week - 1));
+    final to = shiftDayKey(from, 6);
     bool inWeek(Object? day) =>
         day is String && day.compareTo(from) >= 0 && day.compareTo(to) <= 0;
 
@@ -82,7 +81,9 @@ class ResearchSummary {
       delayCravingCompleted: habitDelays
           .where((row) => inWeek(row['day']) && row['completed'] != false)
           .length,
-      habitSwapCount: habitSwaps.where((row) => inWeek(row['day'])).length,
+      habitSwapCount: habitSwaps
+          .where((row) => inWeek(row['day']) && row['outcome'] != 'not_tried')
+          .length,
     );
   }
 

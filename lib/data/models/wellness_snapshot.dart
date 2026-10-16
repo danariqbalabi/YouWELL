@@ -21,6 +21,10 @@ JsonMap createEmptyWellnessState() => {
   'focusSessions': <dynamic>[],
   'habitDelays': <dynamic>[],
   'habitSwaps': <dynamic>[],
+  'reductionSettings': <String, dynamic>{},
+  'nicotineDays': <dynamic>[],
+  'reductionTargets': <dynamic>[],
+  'reductionPlans': <String, dynamic>{},
   'openedDays': <dynamic>[],
   'capacity': <String, dynamic>{},
   'workoutSessions': <dynamic>[],
@@ -39,3 +43,17 @@ JsonMap restoreWellnessState(String serialized) {
   }
   return {...createEmptyWellnessState(), ...decoded};
 }
+
+bool canRestoreWellnessState(String serialized) {
+  try {
+    restoreWellnessState(serialized);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Shown once after storage set aside a snapshot this version cannot read.
+const unreadableStateNotice =
+    'Data lokal tidak bisa dibaca, jadi aplikasi mulai baru. '
+    'Salinan lamanya tetap disimpan terpisah di perangkat ini.';

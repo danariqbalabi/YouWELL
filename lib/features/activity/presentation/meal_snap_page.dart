@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/features/activity/data/meal_photo_store.dart';
+import 'package:youwell/shared/widgets/ui_helpers.dart';
 
 class MealSnapPage extends StatefulWidget {
   const MealSnapPage({super.key, required this.controller});
@@ -53,8 +55,12 @@ class _MealSnapPageState extends State<MealSnapPage> {
           _error = null;
         });
       }
-    } catch (_) {
-      // Denied or missing camera: swap today's photo quest for a check-off.
+    } on PlatformException catch (error) {
+      // Only a denied or missing camera swaps the photo quest for a check-off.
+      if (!_cameraUnavailableCodes.contains(error.code)) {
+        _retryLater();
+        return;
+      }
       widget.controller.markCameraUnavailable();
       if (mounted) {
         setState(
@@ -63,6 +69,14 @@ class _MealSnapPageState extends State<MealSnapPage> {
               '"Tambahkan buah atau sayur" yang cukup dicentang.',
         );
       }
+    } catch (_) {
+      _retryLater();
+    }
+  }
+
+  void _retryLater() {
+    if (mounted) {
+      setState(() => _error = 'Foto belum bisa diambil. Coba sekali lagi.');
     }
   }
 
@@ -113,7 +127,7 @@ class _MealSnapPageState extends State<MealSnapPage> {
   }
 
   bool _programEnded() {
-    if (!widget.controller.wellnessProgramComplete) return false;
+    if (!widget.controller.uatProgramComplete) return false;
     if (mounted) {
       setState(() {
         _saving = false;
@@ -126,54 +140,19 @@ class _MealSnapPageState extends State<MealSnapPage> {
 
   Future<void> _noteOnly() async {
     if (_programEnded()) return;
-    final note = TextEditingController();
-    await showDialog<void>(
+    final note = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Catat tanpa foto'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Masuk ke jurnal pribadimu. Misi Meal Snap tetap butuh foto.',
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: note,
-              maxLength: 200,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'Apa yang kamu makan?',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Batal'),
-          ),
-          ValueListenableBuilder(
-            valueListenable: note,
-            builder: (context, value, _) => FilledButton(
-              onPressed: value.text.trim().isEmpty
-                  ? null
-                  : () {
-                      if (_programEnded()) {
-                        Navigator.pop(dialogContext);
-                        return;
-                      }
-                      widget.controller.recordMeal(note: note.text);
-                      Navigator.pop(dialogContext);
-                      Navigator.pop(this.context);
-                    },
-              child: const Text('Simpan'),
-            ),
-          ),
-        ],
+      builder: (_) => const TextEntryDialog(
+        title: 'Catat tanpa foto',
+        message: 'Masuk ke jurnal pribadimu. Misi Meal Snap tetap butuh foto.',
+        hint: 'Apa yang kamu makan?',
+        maxLength: 200,
+        confirmLabel: 'Simpan',
       ),
     );
-    note.dispose();
+    if (note == null || !mounted || _programEnded()) return;
+    widget.controller.recordMeal(note: note);
+    Navigator.pop(context);
   }
 
   @override
@@ -236,3 +215,10 @@ class _MealSnapPageState extends State<MealSnapPage> {
     ),
   );
 }
+
+/// image_picker codes for a camera the user denied or the device lacks.
+const _cameraUnavailableCodes = {
+  'camera_access_denied',
+  'camera_access_restricted',
+  'no_available_camera',
+};

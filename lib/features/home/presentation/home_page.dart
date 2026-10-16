@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:youwell/core/utils/date_key.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/features/companion/domain/companion_rewards.dart';
@@ -36,14 +37,13 @@ class HomePage extends StatelessWidget {
     );
     final dayNumber = started == null
         ? 1
-        : controller.now.difference(started).inDays + 1;
+        : daysBetweenKeys(dayKey(started), controller.today) + 1;
     Widget questCard(Map<String, dynamic> task) => Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: _QuestCard(
         task: task,
         onComplete: switch (task['activityKind']) {
           null => () => controller.completeCard(task['id'].toString()),
-          'delay' ||
           'habit_swap' => () => openReductionSupport(context, controller),
           _ => onOpenActivity,
         },
@@ -56,19 +56,20 @@ class HomePage extends StatelessWidget {
           'Hai, ${controller.profile!['alias']}!',
           style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
         ),
-        const SizedBox(height: 4),
-        Text(
-          controller.wellnessUat
-              ? '28 hari membangun langkah kecil'
-              : 'Hari ke-$dayNumber perjalananmu',
-          style: text.bodyMedium?.copyWith(
-            color: c.muted,
-            fontWeight: FontWeight.w700,
+        // The program card below already says which day it is.
+        if (controller.uatProgram == null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Hari ke-$dayNumber perjalananmu',
+            style: text.bodyMedium?.copyWith(
+              color: c.muted,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
-        if (controller.wellnessUat) ...[
-          WellnessProgramCard(controller: controller),
+        ],
+        const SizedBox(height: 16),
+        if (controller.uatProgram != null) ...[
+          WellnessProgramCard(controller: controller, compact: true),
           const SizedBox(height: 16),
         ],
         _PlayerCard(controller: controller, companionKey: companionKey),
@@ -76,7 +77,7 @@ class HomePage extends StatelessWidget {
           const SizedBox(height: 16),
           _LadderBanner(controller: controller),
         ],
-        if (!controller.wellnessProgramComplete) ...[
+        if (!controller.uatProgramComplete) ...[
           const SizedBox(height: 32),
           _TodayHeader(controller: controller),
           if (controller.quests.isEmpty && controller.needsDailyCardDraw)
@@ -130,9 +131,7 @@ class _PlayerCardState extends State<_PlayerCard> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
-    final kind = controller.profile!['companion'].toString();
-    final name =
-        const {'plant': 'Mori', 'cat': 'Milo', 'cloud': 'Awan'}[kind] ?? 'Mori';
+    const name = companionName;
     final level = controller.level;
 
     final next = companionUnlocks
@@ -571,7 +570,7 @@ const _shortLadder = {
   'Body': 'Gerak',
   'Food': 'Makan',
   'Energy': 'Istirahat',
-  'Reduction': 'Jeda',
+  'Reduction': 'Habit Swap',
   'Lifestyle': 'Hidrasi',
 };
 
@@ -596,8 +595,6 @@ class _QuestCard extends StatelessWidget {
         ? 'Selesai'
         : kind == null
         ? 'Tandai selesai'
-        : kind == 'delay'
-        ? 'Mulai timer Delay Craving'
         : kind == 'habit_swap'
         ? 'Pilih Habit Swap'
         : 'Buka Aktivitas untuk menyelesaikan';
@@ -644,7 +641,12 @@ class _QuestCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         [
-                          done ? 'Selesai' : '${task['durationMinutes']} menit',
+                          if (done)
+                            'Selesai'
+                          // "1 menit" for a water or meal goal reads wrong.
+                          else if (!const {'water', 'meal_snap'}
+                              .contains(task['activityKind']))
+                            '${task['durationMinutes']} menit',
                           if (task['ladder'] != null)
                             '${_shortLadder[task['ladder']]} Lv ${task['step']}',
                         ].join(' · '),

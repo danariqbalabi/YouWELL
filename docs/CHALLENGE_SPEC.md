@@ -4,10 +4,35 @@ Dokumen ini adalah pelengkap `CLAUDE.md` dan ditaruh di `docs/CHALLENGE_SPEC.md`
 
 **Aturan utama:** semua personalisasi berbasis aturan (*rule-based*) dan bisa dijelaskan ke pengguna. **Tanpa machine learning.**
 
+## Penghapusan timer path rokok/vape (15 Oktober 2026)
+
+Permintaan terbaru pengembang menggantikan tangga Jeda/timer di bagian lama
+dokumen ini: Delay Craving, misi menunggu 2–60 menit, statistik menit ditunda,
+dan lencananya dihapus dari alur aktif. Setiap kartu reduction berisi satu
+Habit Swap (catat aktivitas pengganti yang sudah dicoba) + dua kategori
+wellness. Habit Swap tidak naik menjadi durasi menunggu yang lebih panjang.
+Satu catatan hanya menyelesaikan satu misi; extra/bonus baru tidak menduplikasi
+Habit Swap inti. Quest timer lama yang masih terbuka/draft dimigrasikan,
+sementara quest selesai, XP, dan log historis tetap tersimpan.
+
+Kolom `delay_craving_count`/`delay_craving_completed` dan `ladder_jeda` tetap
+dibaca demi kompatibilitas ekspor lama; catatan timer baru tidak dibuat.
+`ladder_jeda` pada kartu baru merujuk key Reduction yang tetap di tingkat 1,
+bukan kemampuan menunggu. Implementasi lanjutan pada hari yang sama menambahkan
+jurnal konsumsi, target opsional, serta periode reduction 28 hari. Aturan
+lengkap dan sumber ada di [REDUCTION_UAT.md](REDUCTION_UAT.md): kedua path memakai
+batas wellness ringan dan rekomendasi; reduction mengutamakan gerak saat seri.
+Habit Swap memerlukan pemicu, aktivitas, jenis penggunaan, serta hasil yang
+dilaporkan pengguna. Pengiriman duplikat ditolak berdasarkan ID, tanpa cooldown.
+Percobaan sebelum memilih kartu dihitung sekali saat commit; catatan lama
+tanpa hasil tidak otomatis menjadi bukti. Kedua hasil mencoba mendapat XP
+yang sama; belum mencoba dan total konsumsi tidak memberi XP.
+
 ## Penyesuaian WELLNESS UAT 28 hari (14 Oktober 2026)
 
-Bagian ini mengikuti permintaan pengembang untuk demo satu bulan dan berlaku
-hanya pada path WELLNESS. Path rokok/vape akan dievaluasi pada tahap berikutnya.
+Bagian ini awalnya berlaku untuk WELLNESS pada 14 Oktober. Pada 15 Oktober,
+batas periode dan latihan ringan juga diterapkan pada reduction; alur khusus
+rokok/vape mengikuti REDUCTION_UAT.md dan keputusan terbaru di atas.
 Tabel tangga lengkap di bawah tetap menjadi referensi jangka panjang.
 
 - Periode adalah 28 **hari kalender** sejak onboarding, bukan 28 hari aktif.

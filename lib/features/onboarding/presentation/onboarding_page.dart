@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/core/theme/appearance_scope.dart';
+import 'package:youwell/features/companion/domain/companion_rewards.dart';
 import 'package:youwell/features/companion/presentation/mobile_companion.dart';
 import 'package:youwell/shared/widgets/game_widgets.dart';
+import 'package:youwell/features/reduction/domain/reduction_policy.dart';
 import 'package:youwell/features/auth/presentation/account_scope.dart';
 
 /// Conversational onboarding: the companion asks one question per screen.
@@ -21,11 +23,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
   String _companion = 'plant';
   bool _lowImpact = false;
   String? _ageGroup;
+  String? _nicotineProduct;
   String? _error;
   final _alias = TextEditingController();
 
   static const _lastStep = 3;
-  static const _names = {'plant': 'Mori', 'cat': 'Milo', 'cloud': 'Awan'};
 
   /// 18–22 spans the PP 28/2024 age-21 line, so it gets quit framing too.
   bool get _quitFraming => _ageGroup == 'under18' || _ageGroup == '18-22';
@@ -33,6 +35,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
   /// Blocks "Lanjut" until the current step has what the rules require.
   String? _stepError() => switch (_step) {
     0 when _ageGroup == null => 'Pilih rentang usiamu dulu.',
+    1 when _path == 'reduction' && _nicotineProduct == null =>
+      'Pilih jenis penggunaanmu dulu.',
     _ => null,
   };
 
@@ -69,20 +73,28 @@ class _OnboardingPageState extends State<OnboardingPage> {
         'companion': _companion,
         'waterGoal': 2000,
         'ageGroup': _ageGroup,
+        if (_path == 'reduction') 'nicotineProduct': _nicotineProduct,
       });
+    } on ArgumentError {
+      if (mounted) {
+        setState(
+          () => _error = 'Alias 3–20 karakter, diawali huruf (huruf/angka/_).',
+        );
+      }
     } catch (_) {
-      setState(
-        () => _error = 'Alias 3–20 karakter, diawali huruf (huruf/angka/_).',
-      );
+      if (mounted) {
+        setState(
+          () => _error = 'Profil belum tersimpan di perangkat. Coba lagi.',
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final name = _names[_companion]!;
     final (question, helper) = switch (_step) {
-      0 => ('Hai! Aku $name, teman tumbuhmu. Umurmu berapa?', ''),
+      0 => ('Hai! Aku $companionName, teman tumbuhmu. Umurmu berapa?', ''),
       1 => (
         'Oke! Kamu mau fokus ke mana dulu?',
         'Bisa diganti kapan saja di Profil.',
@@ -92,7 +104,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         'Tenang, misinya naik pelan-pelan ketika kamu siap.',
       ),
       _ => (
-        'Terakhir! Pilih temanmu, lalu kasih tahu mau dipanggil apa.',
+        'Terakhir! Pilih warna $companionName, lalu kasih tahu mau dipanggil apa.',
         'Alias ini yang tampil di Community, bukan nama asli.',
       ),
     };
@@ -216,11 +228,22 @@ class _OnboardingPageState extends State<OnboardingPage> {
         icon: Icons.smoke_free_rounded,
         title: _quitFraming ? 'Berhenti rokok / vape' : 'Kurangi rokok / vape',
         detail: _quitFraming
-            ? 'Latih jeda saat ingin, lalu ganti dengan aktivitas lain.'
-            : 'Tunda keinginan dan coba aktivitas pengganti, tanpa dihakimi.',
+            ? 'Kenali kebiasaan dan coba aktivitas pengganti saat ingin.'
+            : 'Coba aktivitas pengganti saat ingin, tanpa dihakimi.',
         selected: _path == 'reduction',
         onTap: () => _pick(() => _path = 'reduction'),
       ),
+      if (_path == 'reduction') ...[
+        const SizedBox(height: 12),
+        const Text('Apa yang kamu gunakan? Rokok dan vape dicatat terpisah.'),
+        for (final entry in nicotineProductLabels.entries)
+          _Option(
+            icon: Icons.smoke_free_rounded,
+            title: entry.value,
+            selected: _nicotineProduct == entry.key,
+            onTap: () => _pick(() => _nicotineProduct = entry.key),
+          ),
+      ],
     ],
     2 => [
       for (final (value, title, detail, icon) in const [
@@ -276,7 +299,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             Expanded(
               child: _CompanionChoice(
                 kind: kind,
-                name: _names[kind]!,
+                name: companionColors[kind]!,
                 selected: _companion == kind,
                 onTap: () => _pick(() => _companion = kind),
               ),
@@ -426,7 +449,7 @@ class _CompanionChoice extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: 'Pilih $name',
+      label: 'Pilih warna $name',
       child: GameCard(
         onTap: onTap,
         color: selected ? c.selected : c.card,

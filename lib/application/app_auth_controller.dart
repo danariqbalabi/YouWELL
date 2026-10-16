@@ -8,6 +8,8 @@ import 'package:youwell/data/models/wellness_snapshot.dart';
 import 'wellness_controller.dart';
 import 'progress_sync_controller.dart';
 import 'package:youwell/features/sync/domain/cloud_progress.dart';
+import 'package:youwell/features/community/domain/community_store.dart';
+import 'package:youwell/features/progress/domain/research_log_store.dart';
 
 enum AuthStage {
   signedOut,
@@ -26,6 +28,8 @@ class AppAuthController extends ChangeNotifier {
     required this.cache,
     required this.surface,
     this.progressStore,
+    this.communityStore,
+    this.researchStore,
     this.timeout = const Duration(seconds: 12),
   });
   final AuthGateway gateway;
@@ -33,7 +37,13 @@ class AppAuthController extends ChangeNotifier {
   final AppSurface surface;
   final Duration timeout;
   final ProgressCloudStore Function(String userId)? progressStore;
+  final CommunityStore Function(String userId)? communityStore;
+  final ResearchLogStore? researchStore;
+  bool _sendingResearch = false;
   ProgressSyncController? progress;
+
+  /// Server Community for the signed-in account; null in local previews.
+  CommunityStore? community;
   StreamSubscription<AuthIdentity?>? _subscription;
   Timer? _loginTimer;
   AuthStage stage = AuthStage.loading;
@@ -78,12 +88,16 @@ class AppAuthController extends ChangeNotifier {
     if (!force &&
         identity != null &&
         identity.id == _userId &&
-        (stage == AuthStage.mfa ||
-            (surface != AppSurface.admin &&
-                const [
-                  AuthStage.ready,
-                  AuthStage.importChoice,
-                ].contains(stage)))) {
+        const [
+          AuthStage.mfa,
+          AuthStage.ready,
+          AuthStage.importChoice,
+        ].contains(stage)) {
+      // Token refreshes must not reload an open moderator console; access is
+      // still re-checked quietly, and the server checks every moderation call.
+      if (surface == AppSurface.admin && stage == AuthStage.ready) {
+        unawaited(_recheckAdmin());
+      }
       return;
     }
     final generation = ++_generation;
@@ -94,6 +108,7 @@ class AppAuthController extends ChangeNotifier {
     if (!sameUser || identity == null) {
       progress?.dispose();
       progress = null;
+      community = null;
       wellness?.dispose();
       wellness = null;
     }
@@ -142,9 +157,31 @@ class AppAuthController extends ChangeNotifier {
     }
   }
 
+  Future<void> _recheckAdmin() async {
+    final generation = _generation;
+    try {
+      final access = await gateway.adminAccess().timeout(timeout);
+      if (_disposed ||
+          generation != _generation ||
+          stage != AuthStage.ready ||
+          access == AdminAccess.allowed) {
+        return;
+      }
+      ++_generation;
+      community = null;
+      wellness?.dispose();
+      wellness = null;
+      stage = access == AdminAccess.needsMfa ? AuthStage.mfa : AuthStage.denied;
+      _notify();
+    } catch (_) {
+      // Offline: keep the console; moderation calls are refused server-side.
+    }
+  }
+
   Future<void> _activate(String userId, String? saved, int generation) async {
     progress?.dispose();
     progress = null;
+    community = communityStore?.call(userId);
     // Moderator and framed UI-preview data must never become participant progress.
     final store = surface == AppSurface.mobile
         ? progressStore?.call(userId)
@@ -171,7 +208,44 @@ class AppAuthController extends ChangeNotifier {
       }
     }
     _replaceWellness(userId, saved, progress);
+    if (cache.takeRecovered(userId)) {
+      wellness!.storageError = unreadableStateNotice;
+    }
     stage = AuthStage.ready;
+    unawaited(submitResearch());
+  }
+
+  /// Sends due weekly summaries for a consenting UAT participant. Only the
+  /// code and the agreed numbers leave the device; failures retry later.
+  Future<void> submitResearch() async {
+    final store = researchStore, current = wellness;
+    if (store == null ||
+        current == null ||
+        surface != AppSurface.mobile ||
+        _sendingResearch) {
+      return;
+    }
+    _sendingResearch = true;
+    try {
+      for (final week in current.researchWeeksDue) {
+        final code = current.researchParticipation?['code']?.toString();
+        if (code == null) return;
+        final complete = current.researchWeekComplete(week);
+        await store
+            .submit(
+              participantCode: code,
+              weekComplete: complete,
+              summary: current.researchSummary(week).toJson(),
+            )
+            .timeout(timeout);
+        if (_disposed || !identical(current, wellness)) return;
+        current.markResearchSent(week, complete: complete);
+      }
+    } catch (_) {
+      // Offline or not migrated yet: the same weeks stay due.
+    } finally {
+      _sendingResearch = false;
+    }
   }
 
   void _replaceWellness(
@@ -200,6 +274,7 @@ class AppAuthController extends ChangeNotifier {
           : null;
       if (_disposed || generation != _generation) return;
       if (!import) {
+        await cache.declineLegacy(userId).timeout(timeout);
         await cache
             .write(userId, jsonEncode(createEmptyWellnessState()))
             .timeout(timeout);
@@ -245,6 +320,7 @@ class AppAuthController extends ChangeNotifier {
     _userId = null;
     progress?.dispose();
     progress = null;
+    community = null;
     wellness?.dispose();
     wellness = null;
     stage = AuthStage.loading;
@@ -261,6 +337,49 @@ class AppAuthController extends ChangeNotifier {
   }
 
   Future<void> retry() => _open(gateway.identity, force: true);
+
+  /// Reset keeps the account but drops recovery copies of the old progress,
+  /// which would otherwise still hold private reduction logs.
+  Future<void> clearRecoveryCopies() async {
+    final userId = _userId;
+    if (userId != null) await cache.clearBackups(userId);
+  }
+
+  /// Deletes the account on the server first (UU PDP Pasal 8 & 9). Local data
+  /// goes only after the server confirmed, so a network error never leaves a
+  /// half-deleted account. [deleteLocalFiles] removes this account's photos.
+  Future<void> deleteAccount({
+    required Future<void> Function() deleteLocalFiles,
+  }) async {
+    final userId = _userId;
+    if (userId == null || stage != AuthStage.ready) {
+      throw StateError('Tidak ada akun yang sedang dibuka.');
+    }
+    await gateway.deleteAccount().timeout(timeout);
+    ++_generation;
+    _loginTimer?.cancel();
+    progress?.dispose();
+    progress = null;
+    community = null;
+    stage = AuthStage.loading;
+    _notify();
+    await deleteLocalFiles();
+    // Let queued device writes land before they are wiped.
+    await wellness?.flush();
+    wellness?.dispose();
+    wellness = null;
+    await cache.wipe(userId);
+    _userId = null;
+    try {
+      await gateway.signOut().timeout(timeout);
+    } catch (_) {
+      // The server account is gone; the local session is cleared anyway.
+    }
+    if (_disposed) return;
+    error = null;
+    stage = AuthStage.signedOut;
+    _notify();
+  }
 
   Future<void> resolveProgress({required bool useCloud}) async {
     final sync = progress;

@@ -40,14 +40,14 @@ class ProgressCalculator {
   int get level => levelForXp(xp);
 
   int activeDaysIn(int period) {
-    final start = dayKey(now.subtract(Duration(days: period - 1)));
+    final start = shiftDayKey(today, -(period - 1));
     return activeDays
         .where((day) => day.compareTo(start) >= 0 && day.compareTo(today) <= 0)
         .length;
   }
 
   double completionRate(int period) {
-    final start = dayKey(now.subtract(Duration(days: period - 1)));
+    final start = shiftDayKey(today, -(period - 1));
     var total = 0, completed = 0;
     for (final entry in days.entries.where(
       (entry) =>

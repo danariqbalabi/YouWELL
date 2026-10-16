@@ -11,7 +11,6 @@ IconData questIcon(Map<String, dynamic> task) =>
     switch (task['activityKind'] ?? task['catalogId'] ?? task['ladder']) {
       'walk' => Icons.directions_walk_rounded,
       'run' => Icons.directions_run_rounded,
-      'delay' => Icons.timer_outlined,
       'habit_swap' => Icons.swap_horiz_rounded,
       'water' || 'water-glass' => Icons.water_drop_rounded,
       'meal_snap' || 'ladder-food' || 'Food' => Icons.restaurant_rounded,
@@ -27,7 +26,7 @@ IconData questIcon(Map<String, dynamic> task) =>
       _ => switch (task['category']) {
         'Body' => Icons.directions_walk_rounded,
         'Energy' => Icons.bedtime_rounded,
-        'Reduction' => Icons.timer_outlined,
+        'Reduction' => Icons.swap_horiz_rounded,
         'Lifestyle' => Icons.water_drop_rounded,
         'Food' => Icons.restaurant_rounded,
         _ => Icons.auto_awesome_rounded,
@@ -394,7 +393,7 @@ class WeekStrip extends StatelessWidget {
         for (var back = 6; back >= 0; back--)
           Builder(
             builder: (context) {
-              final date = now.subtract(Duration(days: back));
+              final date = DateTime(now.year, now.month, now.day - back);
               final key = dayKey(date);
               final active = activeDays.contains(key);
               final isToday = key == today;

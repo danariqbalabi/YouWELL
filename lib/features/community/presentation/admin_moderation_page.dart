@@ -1,89 +1,201 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/core/config/app_environment.dart';
+import 'package:youwell/features/community/domain/community_store.dart';
+import 'package:youwell/features/community/presentation/community_page.dart';
+import 'package:youwell/core/platform/platform.dart' as platform;
+import 'package:youwell/features/auth/presentation/account_scope.dart';
+import 'package:youwell/features/progress/domain/research_log_store.dart';
 
-class AdminModerationPage extends StatelessWidget {
+const _reasonLabels = {'unsafe': 'Tidak aman', 'spam': 'Spam'};
+
+class AdminModerationPage extends StatefulWidget {
   const AdminModerationPage({super.key, required this.controller});
   final WellnessController controller;
 
   @override
+  State<AdminModerationPage> createState() => _AdminModerationPageState();
+}
+
+class _AdminModerationPageState extends State<AdminModerationPage> {
+  late CommunityStore _store;
+  ModerationQueue? _queue;
+  String? _error;
+  bool _busy = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _store = communityStoreOf(context, widget.controller);
+    if (_queue == null) _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final queue = await _store.moderationQueue();
+      if (mounted) {
+        setState(() {
+          _queue = queue;
+          _error = null;
+        });
+      }
+    } on CommunityException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    }
+  }
+
+  /// Researchers download the latest weekly logs: codes and numbers only.
+  Future<void> _exportResearch(ResearchLogStore store) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final rows = await store.exportLatest();
+      platform.download(
+        'youwell-research-logs.csv',
+        utf8.encode(researchCsv(rows)),
+        'text/csv',
+      );
+      messenger.showSnackBar(
+        SnackBar(content: Text('${rows.length} baris diunduh.')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Ringkasan belum bisa diunduh. Periksa koneksi dan migration tahap 4.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _act(Future<void> Function() action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+    } on CommunityException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
+    await _load();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final queue = controller.moderationQueue;
-    final reports = controller.communityReports;
-    return ListView(
-      padding: const EdgeInsets.all(30),
-      children: [
-        const Text(
-          'Moderasi komunitas',
-          style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Pratinjau lokal. Halaman ini belum menerima post dari perangkat peserta.',
-          style: TextStyle(color: context.colors.muted),
-        ),
-        const SizedBox(height: 24),
-        if (AppEnvironment.showPreviewTools) ...[
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: controller.addModerationPreviewPost,
-              icon: const Icon(Icons.add),
-              label: const Text('Tambah contoh post'),
-            ),
+    final queue = _queue;
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(30),
+        children: [
+          const Text(
+            'Moderasi komunitas',
+            style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
+          Text(
+            _store.shared
+                ? 'Post peserta tampil setelah kamu setujui. Hanya alias dan isi post yang terlihat.'
+                : 'Pratinjau lokal. Halaman ini tidak menerima post dari perangkat peserta.',
+            style: TextStyle(color: context.colors.muted),
+          ),
+          const SizedBox(height: 24),
+          if (AccountScope.maybeOf(context)?.researchStore case final research?) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => _exportResearch(research),
+                icon: const Icon(Icons.download_rounded),
+                label: const Text('Unduh ringkasan penelitian (CSV)'),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (!_store.shared && AppEnvironment.showPreviewTools) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => _act(() async {
+                  widget.controller.addModerationPreviewPost();
+                }),
+                icon: const Icon(Icons.add),
+                label: const Text('Tambah contoh post'),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (_error != null) ...[
+            _Empty(message: _error!),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _load,
+                child: const Text('Coba lagi'),
+              ),
+            ),
+          ] else if (queue == null)
+            const Center(child: CircularProgressIndicator())
+          else ...[
+            _Summary(
+              pending: queue.pending.length,
+              reports: queue.reports.length,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Menunggu persetujuan',
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 12),
+            if (queue.pending.isEmpty)
+              const _Empty(message: 'Tidak ada post yang menunggu review.'),
+            for (final post in queue.pending)
+              _ModerationCard(
+                post: post,
+                busy: _busy,
+                approveLabel: 'Setujui',
+                rejectLabel: 'Tolak',
+                onApprove: () =>
+                    _act(() => _store.moderate(post.id, approve: true)),
+                onReject: () =>
+                    _act(() => _store.moderate(post.id, approve: false)),
+              ),
+            const SizedBox(height: 24),
+            const Text(
+              'Laporan',
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 12),
+            if (queue.reports.isEmpty)
+              const _Empty(message: 'Tidak ada laporan aktif.'),
+            for (final report in queue.reports)
+              _ModerationCard(
+                post: report.post,
+                busy: _busy,
+                label: 'Dilaporkan: ${_reasonLabels[report.reason] ?? report.reason}',
+                approveLabel: 'Biarkan tampil',
+                rejectLabel: 'Sembunyikan',
+                onApprove: () => _act(() => _store.resolveReport(report.id)),
+                onReject: () async {
+                  await _act(
+                    () => _store.moderate(report.post.id, approve: false),
+                  );
+                  // The server settles reports on hide; the preview does not.
+                  if (!_store.shared) {
+                    await _act(() => _store.resolveReport(report.id));
+                  }
+                },
+              ),
+          ],
         ],
-        _Summary(pending: queue.length, reports: reports.length),
-        const SizedBox(height: 24),
-        const Text(
-          'Menunggu persetujuan',
-          style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        if (queue.isEmpty)
-          const _Empty(message: 'Tidak ada post yang menunggu review.'),
-        ...queue.map(
-          (post) => _ModerationCard(controller: controller, post: post),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Laporan',
-          style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        if (reports.isEmpty) const _Empty(message: 'Tidak ada laporan aktif.'),
-        ...reports.map(
-          (report) => Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: context.colors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: context.colors.border),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.flag_outlined, color: context.colors.amber),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '${report['reason']} • ${report['postId']}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => controller.resolveCommunityReport(
-                    report['id'].toString(),
-                  ),
-                  child: const Text('Selesaikan'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -134,9 +246,20 @@ class _Number extends StatelessWidget {
 }
 
 class _ModerationCard extends StatelessWidget {
-  const _ModerationCard({required this.controller, required this.post});
-  final WellnessController controller;
-  final Map<String, dynamic> post;
+  const _ModerationCard({
+    required this.post,
+    required this.busy,
+    required this.approveLabel,
+    required this.rejectLabel,
+    required this.onApprove,
+    required this.onReject,
+    this.label,
+  });
+  final CommunityPost post;
+  final bool busy;
+  final String approveLabel, rejectLabel;
+  final String? label;
+  final VoidCallback onApprove, onReject;
   @override
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(bottom: 12),
@@ -149,39 +272,43 @@ class _ModerationCard extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (label case final label?) ...[
+          Row(
+            children: [
+              Icon(Icons.flag_outlined, color: context.colors.amber, size: 18),
+              const SizedBox(width: 6),
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
         Text(
-          '@${post['alias']}',
+          '@${post.alias}',
           style: TextStyle(
             color: context.colors.accent,
             fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 10),
-        if (post['sample'] == true) ...[
+        if (post.sample) ...[
           const Chip(label: Text('Contoh lokal')),
           const SizedBox(height: 8),
         ],
-        Text(post['text'].toString(), style: const TextStyle(height: 1.5)),
+        Text(post.body, style: const TextStyle(height: 1.5)),
         const SizedBox(height: 16),
         Wrap(
           spacing: 10,
+          runSpacing: 8,
           children: [
             FilledButton.icon(
-              onPressed: () => controller.moderateCommunityPost(
-                post['id'].toString(),
-                'approved',
-              ),
+              onPressed: busy ? null : onApprove,
               icon: const Icon(Icons.check_rounded),
-              label: const Text('Setujui'),
+              label: Text(approveLabel),
             ),
             OutlinedButton.icon(
-              onPressed: () => controller.moderateCommunityPost(
-                post['id'].toString(),
-                'rejected',
-                note: 'Tidak sesuai panduan komunitas.',
-              ),
+              onPressed: busy ? null : onReject,
               icon: const Icon(Icons.close_rounded),
-              label: const Text('Tolak'),
+              label: Text(rejectLabel),
             ),
           ],
         ),

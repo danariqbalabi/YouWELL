@@ -77,6 +77,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Berhenti rokok / vape'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Rokok'), 150);
+    await tester.tap(find.text('Rokok'));
     await tester.tap(find.text('Lanjut'));
     await tester.pumpAndSettle();
     expect(find.text('Mau mulai sesantai apa?'), findsOneWidget);

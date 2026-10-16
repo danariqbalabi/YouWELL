@@ -21,7 +21,7 @@ String dayLabel(String key, DateTime now) {
   final date = DateTime.tryParse(key);
   if (date == null) return key;
   if (key == dayKey(now)) return 'Hari ini';
-  if (key == dayKey(now.subtract(const Duration(days: 1)))) return 'Kemarin';
+  if (key == shiftDayKey(dayKey(now), -1)) return 'Kemarin';
   return '${_days[date.weekday - 1]}, ${date.day} ${_months[date.month - 1]}';
 }
 

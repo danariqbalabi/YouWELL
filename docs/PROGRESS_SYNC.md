@@ -26,13 +26,26 @@ baru untuk setiap quest. Login saja tanpa membuat profil belum membuat baris.
 Alias, jalur, companion, rentang usia/preferensi onboarding, tanggal mulai,
 quest/kartu yang dipilih, task selesai, XP, level, tangga, lencana, reward,
 hidrasi, hari aplikasi dibuka, dan metadata aktivitas (durasi/meter, waktu
-check-in foto, jumlah/durasi Delay Craving serta metadata Habit Swap).
+check-in foto, jumlah/durasi Delay Craving lama, serta ID + tanggal Habit Swap).
 
 File foto, `photoPath`, rute/koordinat, catatan bebas, isi Habit Swap pribadi,
 komunitas demo, teks Micro-Vent/fokus lama, P-code/persetujuan penelitian,
 token auth, dan offset simulasi hari **tidak dikirim dalam snapshot**.
+Jurnal konsumsi, jenis produk, target mingguan, rencana pengganti, serta detail
+pemicu/aktivitas/hasil Habit Swap juga tetap lokal. Saat menerapkan cloud,
+detail momen dan ID pengiriman lokal dipertahankan hanya untuk ID momen yang
+cocok; perangkat lain hanya menerima tanggal momen (bukan jam atau hasil),
+agar cloud tidak menyimpan log jam craving. Client dan server sama-sama menolak
+kunci mentah rokok/vape (`product`, `trigger`, `outcome`, `nicotineDays`, ...).
 Tidak ada upload ke Supabase Storage. Teks judul/deskripsi quest adalah katalog
-aplikasi, bukan catatan pengguna. Research logs memerlukan integrasi terpisah.
+aplikasi, bukan catatan pengguna. Research logs terpisah dari snapshot ini
+(migration tahap 3, lihat `SUPABASE_SETUP.md`).
+
+Jika balasan simpan hilang tetapi server sudah menyimpan, salinan cloud yang
+sama persis dengan unggahan terakhir dianggap tersimpan (bukan konflik).
+Perubahan yang dibuat saat sinkron berjalan dikirim pada putaran berikutnya.
+Cache lokal yang tidak bisa dibaca disimpan terpisah (`.unreadable`) lalu akun
+mengambil salinan cloud, sehingga cache rusak tidak pernah menimpa cloud.
 
 Metadata `photoCaptured` menjaga bukti quest tanpa memindahkan file fotonya.
 Foto/catatan yang ID-nya cocok tetap terbaca pada perangkat asal; perangkat

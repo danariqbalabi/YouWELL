@@ -11,14 +11,20 @@ buka rekomendasi atau spin/swipe → reveal → maksimal 1 kali ganti → commit
 ```
 
 Setiap paket berisi tiga misi tangga dari kategori berbeda. WELLNESS memilih
-tiga dari Gerak, Makan, Hidrasi, Istirahat; path reduction tetap Jeda + dua
-kategori sehat. Deck Normal berisi 3/3/4/4/5 misi. Tempo awal 1/2/3 menentukan
+tiga dari Gerak, Makan, Hidrasi, Istirahat; path reduction memakai Habit Swap
+tanpa timer + dua kategori sehat (keputusan 15 Okt 2026). Habit Swap tidak
+naik durasi dan tidak diduplikasi dalam misi tambahan. Deck Normal berisi
+3/3/4/4/5 misi. Tempo awal 1/2/3 menentukan
 tangga awal dan ukuran rekomendasi 3/4/5, bukan mengunci semua kartu.
 
-WELLNESS UAT berlangsung 28 hari kalender, lalu rekap. Kenaikan opsional,
+Kedua path UAT berlangsung 28 hari kalender, lalu rekap. Kenaikan opsional,
 menggunakan bukti pada tingkat saat ini, dengan tujuh hari sejak penerimaan.
 Gerak dibatasi jalan tanpa lari, Makan dua foto, Istirahat layar off 30 menit,
 dan Hidrasi sampai tangga 2.000 ml. Lihat batas lengkap di CHALLENGE_SPEC.
+Reduction mengutamakan kategori gerak jika paparan kategori rekomendasi seri,
+tanpa menambah intensitas. Habit Swap memakai pemicu–aktivitas–hasil dengan
+XP sekali untuk percobaan, termasuk saat tetap menggunakan. Jurnal jumlah
+konsumsi terpisah dari quest dan tidak memberikan XP; lihat REDUCTION_UAT.md.
 Pengacakan ukuran menggunakan Fisher–Yates deterministik per tanggal.
 Kategori jarang diambil diprioritaskan; saat seri, rekomendasi memilih beban
 aktivitas lebih ringan. Waktu hidrasi/istirahat tidak ditampilkan sebagai sesi

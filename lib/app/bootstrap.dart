@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/config/app_environment.dart';
 import 'package:youwell/core/config/app_mode.dart';
+import 'package:youwell/data/models/wellness_snapshot.dart';
 import 'package:youwell/data/repositories/local_wellness_repository.dart';
 import 'youwell_app.dart';
 import 'authenticated_app.dart';
@@ -26,5 +27,8 @@ Future<void> bootstrap() async {
     saved: resetLocalData ? null : await localRepository.read(),
     persist: localRepository.write,
   );
+  if (localRepository.recoveredUnreadable) {
+    controller.storageError = unreadableStateNotice;
+  }
   runApp(YouWellApp(controller: controller));
 }

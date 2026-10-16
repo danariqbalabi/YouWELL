@@ -22,9 +22,7 @@ class ActivityHistoryPage extends StatelessWidget {
           {...row, 'collection': 'mealCheckIns'},
       ]..sort((a, b) => b['time'].toString().compareTo(a['time'].toString()));
       final c = context.colors;
-      final weekStart = dayKey(
-        controller.now.subtract(const Duration(days: 6)),
-      );
+      final weekStart = shiftDayKey(controller.today, -6);
       final week = controller.workoutSessions
           .where((row) => row['day'].toString().compareTo(weekStart) >= 0)
           .toList();

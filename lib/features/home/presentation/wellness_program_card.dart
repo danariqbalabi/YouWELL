@@ -4,12 +4,19 @@ import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/shared/widgets/game_widgets.dart';
 
 class WellnessProgramCard extends StatelessWidget {
-  const WellnessProgramCard({super.key, required this.controller});
+  const WellnessProgramCard({
+    super.key,
+    required this.controller,
+    this.compact = false,
+  });
   final WellnessController controller;
+
+  /// Home shows only where you are; Perjalanan explains the week.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final program = controller.wellnessProgram;
+    final program = controller.uatProgram;
     if (program == null) return const SizedBox.shrink();
     final c = context.colors;
     final summaries = [
@@ -18,6 +25,51 @@ class WellnessProgramCard extends StatelessWidget {
     ];
     final questDays = summaries.fold(0, (sum, row) => sum + row.questDayCount);
     final quests = summaries.fold(0, (sum, row) => sum + row.questsDone);
+    final phase = controller.reduction
+        ? switch (program.week) {
+            1 => 'Kenali pola dan pemicu',
+            2 => 'Ubah satu momen rutin',
+            3 => 'Ulangi yang membantu',
+            _ => 'Jaga ritme yang cocok',
+          }
+        : program.phase;
+    if (compact && !program.complete) {
+      return GameCard(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Hari ${program.dayNumber}/28',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    phase,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: c.accent,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            LinearProgressIndicator(
+              value: program.dayNumber / 28,
+              color: c.accent,
+              backgroundColor: c.raised,
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ],
+        ),
+      );
+    }
     return GameCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -51,21 +103,22 @@ class WellnessProgramCard extends StatelessWidget {
               ),
           ] else ...[
             Text(
-              program.phase,
+              phase,
               style: TextStyle(color: c.accent, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 4),
-            Text(program.message),
-            const SizedBox(height: 8),
             Text(
-              'Arah ritme: satu misi pada 4 dari 7 hari. Hari yang terlewat tidak menghapus progres.',
-              style: TextStyle(color: c.muted, fontSize: 12.5),
+              controller.reduction
+                  ? 'Catat apa adanya, lalu coba satu aktivitas pengganti.'
+                  : program.message,
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
               value: program.dayNumber / 28,
               color: c.accent,
               backgroundColor: c.raised,
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(3),
             ),
           ],
         ],

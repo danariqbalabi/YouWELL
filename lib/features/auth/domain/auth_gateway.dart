@@ -20,4 +20,7 @@ abstract interface class AuthGateway {
   Future<AdminAccess> adminAccess();
   Future<MfaSetup> prepareMfa();
   Future<void> verifyMfa(String factorId, String code);
+
+  /// Deletes the signed-in account and, by cascade, all its server data.
+  Future<void> deleteAccount();
 }

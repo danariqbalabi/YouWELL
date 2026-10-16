@@ -4,7 +4,7 @@ import 'package:youwell/features/home/domain/quest_ladder.dart';
 /// Explainable, rule-based daily cards (CHALLENGE_SPEC §4).
 ///
 /// Each of the five cards holds ladder quests from a different mix of
-/// categories (3 random healthy categories, or Jeda + 2 for the
+/// categories (3 random healthy categories, or Habit Swap + 2 for the
 /// smoking/vaping path), plus 0–2 light side quests, so cards carry 3, 3, 4,
 /// 4 and 5 missions. Categories done least this week appear on most cards.
 class DailyCardGenerator {
@@ -105,6 +105,11 @@ class DailyCardGenerator {
         final byPractice = (a['categoryUsage'] as int).compareTo(
           b['categoryUsage'] as int,
         );
+        if (byPractice == 0 && reduction) {
+          final movementA = (a['categories'] as List).contains('Body') ? 1 : 0;
+          final movementB = (b['categories'] as List).contains('Body') ? 1 : 0;
+          if (movementA != movementB) return movementB.compareTo(movementA);
+        }
         return byPractice != 0
             ? byPractice
             : (a['activeMinutes'] as int).compareTo(b['activeMinutes'] as int);
@@ -199,6 +204,7 @@ class DailyCardGenerator {
         [..._catalog, ..._mobileCatalog].where((task) {
           if (taken.contains(task.id)) return false;
           if (task.reductionOnly && !reduction) return false;
+          if (reduction && task.activityKind == 'habit_swap') return false;
           if (task.difficulty > 1) return false;
           if (wellnessUat &&
               (task.durationMinutes > 5 ||
@@ -277,6 +283,10 @@ class DailyCardGenerator {
             return false;
           }
           // One +250 ml tap or one photo must not finish two quests.
+          if (task.activityKind == 'habit_swap' &&
+              categories.contains('Reduction')) {
+            return false;
+          }
           if (task.activityKind == 'water' &&
               categories.contains('Lifestyle')) {
             return false;
@@ -291,10 +301,6 @@ class DailyCardGenerator {
           }
           return true;
         }).toList()..sort((a, b) {
-          // On the smoking/vaping path, a Habit Swap extra comes first.
-          final swapA = reduction && a.id == 'habit-swap' ? 0 : 1;
-          final swapB = reduction && b.id == 'habit-swap' ? 0 : 1;
-          if (swapA != swapB) return swapA.compareTo(swapB);
           return _score(a.id, salt).compareTo(_score(b.id, salt));
         });
     return eligible.take(count).toList();
@@ -344,7 +350,6 @@ class DailyCardGenerator {
       if (!photo || cameraAvailable) 'activityKind': ?rung.activityKind,
       if (!timed) 'targetMeters': ?rung.targetMeters,
       if (timed) 'timed': true,
-      'delayMinutes': ?rung.delayMinutes,
       'waterMl': ?rung.waterMl,
       if (photo && cameraAvailable) 'photoCount': rung.photoCount ?? 1,
       if (photo && cameraAvailable && !anytime && rung.photoWindows != null)
