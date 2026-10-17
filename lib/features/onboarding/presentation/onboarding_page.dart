@@ -71,7 +71,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
         'pace': _pace,
         'lowImpact': _lowImpact,
         'companion': _companion,
-        'waterGoal': 2000,
         'ageGroup': _ageGroup,
         if (_path == 'reduction') 'nicotineProduct': _nicotineProduct,
       });

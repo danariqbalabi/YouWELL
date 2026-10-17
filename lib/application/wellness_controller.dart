@@ -46,6 +46,7 @@ class WellnessController extends ChangeNotifier {
         storageError = 'Data lokal tidak bisa dibaca, jadi aplikasi mulai baru.';
       }
       _replaceRetiredDelayQuests();
+      _matchWorkoutMethod();
       _reconcileActivityEvidence();
       _refreshPendingLadderOffers();
     }
@@ -233,6 +234,30 @@ class WellnessController extends ChangeNotifier {
       quests.isEmpty ? 0 : completedCards.length / quests.length;
   double get water => ((days[today]?['water'] ?? 0) as num).toDouble();
 
+  /// The one hydration target of [day]: its Hidrasi ladder quest if a card
+  /// holds one, else that day's Hidrasi step. 2.000 ml is the ladder's top,
+  /// not a fixed daily goal.
+  int waterTargetOn(String day) {
+    final entry = days[day];
+    final quest = entry is Map
+        ? ((entry['quests'] ?? const []) as List).whereType<Map>().firstWhere(
+            (task) => task['ladder'] == 'Lifestyle' && task['waterMl'] is num,
+            orElse: () => const {},
+          )
+        : const {};
+    if (quest['waterMl'] is num) return (quest['waterMl'] as num).toInt();
+    final steps = entry is Map ? entry['ladderSteps'] : null;
+    final step = day == today || steps is! Map
+        ? ladderSteps['Lifestyle']
+        : (steps['Lifestyle'] as num?)?.toInt();
+    return waterRung(step ?? 1).waterMl!;
+  }
+
+  int get waterTarget => waterTargetOn(today);
+
+  /// The highest Hidrasi step this profile can reach.
+  int get waterTop => waterRung(ladderMaximum('Lifestyle')).waterMl!;
+
   ProgressCalculator get _progress => ProgressCalculator(days: days, now: now);
   List<String> get completedDays => _progress.completedDays;
   List<String> get activeDays => _progress.activeDays;
@@ -342,22 +367,9 @@ class WellnessController extends ChangeNotifier {
   /// Await pending device writes before resolving a cloud conflict.
   Future<void> flush() => _pending;
 
-  /// A committed quest keeps the validation method of the originating device.
-  /// Web can use foreground GPS for an APK-created distance quest; a native
-  /// device can complete a web-created timed quest without changing its target.
-  bool get workoutUsesTimer {
-    final movement = quests.where(
-      (task) =>
-          const {'walk', 'run'}.contains(task['activityKind']) &&
-          (task['status'] != 'completed' ||
-              task['validationInvalidated'] == true),
-    );
-    if (movement.any((task) => ((task['targetMeters'] as num?) ?? 0) > 0)) {
-      return false;
-    }
-    if (movement.any((task) => task['timed'] == true)) return true;
-    return timedWorkouts;
-  }
+  /// The web app always counts walk/run by session time; the APK by GPS.
+  /// Open quests from the other device are converted by [_matchWorkoutMethod].
+  bool get workoutUsesTimer => timedWorkouts;
 
   Future<void> setup(JsonMap value) async {
     final alias = value['alias'].toString().trim();
@@ -369,8 +381,7 @@ class WellnessController extends ChangeNotifier {
       ...value,
       'alias': alias,
       'started': profile?['started'] ?? today,
-      'waterGoal': value['waterGoal'] ?? profile?['waterGoal'] ?? 2000,
-    };
+    }..remove('waterGoal');
     final product = _data['profile'].remove('nicotineProduct');
     if (reduction && nicotineProductLabels.containsKey(product)) {
       _data['reductionSettings'] = {'product': product};
@@ -634,6 +645,74 @@ class WellnessController extends ChangeNotifier {
         ..['reviewedOn'] = today
         ..['change'] = 'hold'
         ..['reason'] = 'Habit Swap mengikuti aktivitas yang kamu pilih.';
+    }
+  }
+
+  /// Open walk/run quests follow this device's method, whichever device drew
+  /// the card: session time on the web app, GPS distance in the APK. The
+  /// ladder step stays the same, so research ladder positions still match.
+  void _matchWorkoutMethod() {
+    final rungs = ladders['Body']!;
+    JsonMap adapt(Map raw) {
+      final task = Map<String, dynamic>.from(raw);
+      final step = (task['step'] as num?)?.toInt();
+      if (task['ladder'] != 'Body' ||
+          !ActivityEvidence.isWorkout(task) ||
+          step == null ||
+          step < 1 ||
+          step > rungs.length ||
+          (task['status'] == 'completed' &&
+              task['validationInvalidated'] != true)) {
+        return task;
+      }
+      final rung = rungs[step - 1];
+      final timed = rung.usesTimer(timed: timedWorkouts);
+      return {
+        ...task
+          ..remove('targetMeters')
+          ..remove('timed'),
+        'title': rung.titleFor(timed: timed),
+        'description': rung.descriptionFor(timed: timed),
+        'durationMinutes': rung.minutesFor(timed: timed),
+        if (timed) 'timed': true else 'targetMeters': ?rung.targetMeters,
+      };
+    }
+
+    JsonMap adaptCard(Map card) {
+      if (card['tasks'] is! List) return adapt(card);
+      final tasks = [
+        for (final task in (card['tasks'] as List).whereType<Map>())
+          adapt(task),
+      ];
+      return {
+        ...card,
+        'tasks': tasks,
+        'durationMinutes': tasks.fold<int>(
+          0,
+          (sum, task) =>
+              sum + ((task['durationMinutes'] as num?)?.toInt() ?? 0),
+        ),
+        if (card.containsKey('activeMinutes'))
+          'activeMinutes': const DailyCardGenerator().activeMinutes(tasks),
+      };
+    }
+
+    for (final entry in (_data['days'] as Map).entries) {
+      if (entry.key.toString().compareTo(today) < 0 || entry.value is! Map) {
+        continue;
+      }
+      final day = entry.value as Map;
+      day['quests'] = [
+        for (final task in (day['quests'] ?? const []) as List)
+          if (task is Map) adapt(task),
+      ];
+      for (final key in ['cardPacks', 'bonusCards']) {
+        if (day[key] is! List) continue;
+        day[key] = [
+          for (final card in (day[key] as List).whereType<Map>())
+            adaptCard(card),
+        ];
+      }
     }
   }
 

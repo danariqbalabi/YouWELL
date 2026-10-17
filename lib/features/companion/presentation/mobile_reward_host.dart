@@ -332,23 +332,67 @@ class _ConfettiPainter extends CustomPainter {
   bool shouldRepaint(_ConfettiPainter old) => old.t != t;
 }
 
-class _FullDayCelebration extends StatelessWidget {
+class _FullDayCelebration extends StatefulWidget {
   const _FullDayCelebration({required this.moment, required this.reduceMotion});
   final RewardMoment moment;
   final bool reduceMotion;
 
   @override
+  State<_FullDayCelebration> createState() => _FullDayCelebrationState();
+}
+
+class _FullDayCelebrationState extends State<_FullDayCelebration>
+    with TickerProviderStateMixin {
+  // The ribbons draw in once, then keep a slow wave and a gliding sheen.
+  late final _intro = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+    value: widget.reduceMotion ? 1 : 0,
+  );
+  late final _flow = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 6),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.reduceMotion) {
+      _intro.forward();
+      _flow.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _intro.dispose();
+    _flow.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final moment = widget.moment;
     const ink = Color(0xff0d1417);
     return Material(
       color: ink,
       child: Stack(
         children: [
           Positioned.fill(
-            child: CustomPaint(painter: _SwooshPainter(c.primary, c.xp)),
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: _SwooshPainter(
+                  c.primary,
+                  c.xp,
+                  intro: _intro,
+                  flow: _flow,
+                  animated: !widget.reduceMotion,
+                ),
+              ),
+            ),
           ),
-          if (!reduceMotion)
+          if (!widget.reduceMotion)
             const Positioned.fill(child: IgnorePointer(child: _Confetti())),
           SafeArea(
             child: Padding(
@@ -410,33 +454,93 @@ class _FullDayCelebration extends StatelessWidget {
   }
 }
 
-/// Two bold curves behind the celebration text.
+/// Two bold ribbons behind the celebration text. When [animated], they draw
+/// in along their length, then sway gently while a soft sheen glides along.
 class _SwooshPainter extends CustomPainter {
-  _SwooshPainter(this.top, this.bottom);
+  _SwooshPainter(
+    this.top,
+    this.bottom, {
+    required this.intro,
+    required this.flow,
+    required this.animated,
+  }) : super(repaint: Listenable.merge([intro, flow]));
   final Color top, bottom;
+  final Animation<double> intro, flow;
+  final bool animated;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final phase = flow.value * math.pi * 2;
+    // A loop of whole sine periods, so the wave never jumps on repeat.
+    double sway(double shift) => animated ? math.sin(phase + shift) : 0;
+    final width = w * .16;
+    final topPath = Path()
+      ..moveTo(-w * .2, h * (.32 + .015 * sway(0)))
+      ..cubicTo(
+        w * .3,
+        h * (.12 + .035 * sway(1.2)),
+        w * .75,
+        h * (.2 - .035 * sway(2.1)),
+        w * 1.15,
+        -h * .05,
+      );
+    final bottomPath = Path()
+      ..moveTo(-w * .2, h * (.74 - .015 * sway(.6)))
+      ..cubicTo(
+        w * .25,
+        h * (.95 - .03 * sway(1.8)),
+        w * .7,
+        h * (.9 + .03 * sway(2.7)),
+        w * 1.2,
+        h * .7,
+      );
+    final reveal = Curves.easeOutCubic.transform(intro.value);
+    // The bottom ribbon follows the top one a little later.
+    final revealBottom = Curves.easeOutCubic.transform(
+      ((intro.value - .2) / .8).clamp(0.0, 1.0),
+    );
+    _ribbon(canvas, topPath, top, width, reveal, flow.value);
+    _ribbon(canvas, bottomPath, bottom, width, revealBottom, flow.value + .5);
+  }
+
+  void _ribbon(
+    Canvas canvas,
+    Path path,
+    Color color,
+    double width,
+    double reveal,
+    double sheenAt,
+  ) {
+    if (reveal <= 0) return;
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = size.width * .16;
-    final w = size.width, h = size.height;
-    canvas.drawPath(
-      Path()
-        ..moveTo(-w * .2, h * .32)
-        ..cubicTo(w * .3, h * .12, w * .75, h * .2, w * 1.15, -h * .05),
-      paint..color = top,
-    );
-    canvas.drawPath(
-      Path()
-        ..moveTo(-w * .2, h * .74)
-        ..cubicTo(w * .25, h * .95, w * .7, h * .9, w * 1.2, h * .7),
-      paint..color = bottom,
-    );
+      ..strokeWidth = width
+      ..color = color;
+    for (final metric in path.computeMetrics()) {
+      final shown = metric.length * reveal;
+      canvas.drawPath(metric.extractPath(0, shown), paint);
+      if (!animated || reveal < 1) continue;
+      // A thin, faint highlight travelling along the ribbon's centre.
+      final start = (sheenAt % 1) * metric.length * 1.3 - metric.length * .15;
+      final sheen = metric.extractPath(
+        start.clamp(0, metric.length),
+        (start + metric.length * .18).clamp(0, metric.length),
+      );
+      canvas.drawPath(
+        sheen,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = width * .28
+          ..color = Colors.white.withValues(alpha: .22)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+    }
   }
 
   @override
   bool shouldRepaint(_SwooshPainter old) =>
-      old.top != top || old.bottom != bottom;
+      old.top != top || old.bottom != bottom || old.animated != animated;
 }

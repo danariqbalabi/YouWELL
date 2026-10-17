@@ -37,6 +37,18 @@ class LadderRung {
   final String? timedTitle;
   final int? timedMinutes;
 
+  /// Whether this device counts the rung by session time (web) or GPS (APK).
+  bool usesTimer({required bool timed}) => timed && timedTitle != null;
+
+  String titleFor({required bool timed}) =>
+      usesTimer(timed: timed) ? timedTitle! : title;
+
+  String descriptionFor({required bool timed}) =>
+      usesTimer(timed: timed) ? timedWorkoutDescription : description;
+
+  int minutesFor({required bool timed}) =>
+      usesTimer(timed: timed) ? timedMinutes! : durationMinutes;
+
   /// Shows "berhenti jika pusing atau nyeri" on the quest.
   final bool strenuous;
 }
@@ -49,11 +61,15 @@ const ladderLabels = {
   'Reduction': 'Ganti kebiasaan',
 };
 
+const timedWorkoutDescription =
+    'Dihitung dari lama sesi. Boleh kunci layar selama sesi.';
+
 /// Low-impact users never enter the running part of the Body ladder.
 const lowImpactBodyMax = 4;
 
-/// Walk/run quests count GPS distance only; time alone never finishes them,
-/// except in the web app, which uses each rung's [LadderRung.timedTitle].
+/// Walk/run quests count GPS distance only in the APK; time alone never
+/// finishes them there. The web app always uses each rung's
+/// [LadderRung.timedTitle], since browsers have no background GPS.
 const ladders = <String, List<LadderRung>>{
   'Body': [
     LadderRung(
@@ -328,6 +344,12 @@ const ladders = <String, List<LadderRung>>{
     ),
   ],
 };
+
+/// The Hidrasi rung at [step], kept inside the ladder.
+LadderRung waterRung(int step) {
+  final rungs = ladders['Lifestyle']!;
+  return rungs[step.clamp(1, rungs.length) - 1];
+}
 
 /// Healthy-living categories a card can draw from (§2).
 const healthyCategories = ['Body', 'Food', 'Lifestyle', 'Energy'];

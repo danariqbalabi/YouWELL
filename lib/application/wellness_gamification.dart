@@ -88,12 +88,11 @@ extension MobileWellnessRewards on WellnessController {
   List<String> _claimAchievements() {
     final stored = (_data['achievements'] ??= <String, dynamic>{}) as Map;
     final earned = <String>[];
-    final hydrationDays = days.values
+    final hydrationDays = days.entries
         .where(
           (day) =>
-              day is Map &&
-              ((day['water'] as num?) ?? 0) >=
-                  ((profile?['waterGoal'] as num?) ?? 2000),
+              day.value is Map &&
+              ((day.value['water'] as num?) ?? 0) >= waterTargetOn(day.key),
         )
         .length;
     final conditions = {

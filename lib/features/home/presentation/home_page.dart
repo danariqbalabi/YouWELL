@@ -533,7 +533,7 @@ class LadderOfferCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            rung.title,
+            rung.titleFor(timed: controller.timedWorkouts),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),

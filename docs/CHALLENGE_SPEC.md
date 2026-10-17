@@ -227,6 +227,13 @@ Tangga Istirahat: layar off 10 → 15 → 20 → 30 → 45 → 60 menit sebelum 
 | 6 | 2.000 ml, gelas pertama sebelum 09.00 *(P1: butuh jam per ketukan +250 ml)* | 〃 + waktu |
 | 7 | 2.000 ml tersebar pagi, siang, dan sore (masing-masing ≥ 500 ml) | 〃 + waktu |
 
+Target hidrasi hanya satu (keputusan 17 Okt 2026): kartu Hidrasi di Aktivitas
+memakai target misi Hidrasi hari itu, atau anak tangga Hidrasi pengguna jika
+kartu hari itu tidak memuat Hidrasi. Tidak ada target harian tetap 2.000 ml;
+2.000 ml adalah puncak tangga dan hanya ditampilkan sebagai "Puncak tangga".
+Lencana 7 hari hidrasi dihitung dari hari yang mencapai target anak tangga
+hari itu.
+
 ### 5.4 🍽️ Makan (maxStep 10, **tanpa** kalori atau larangan)
 
 Validasi: **foto dari kamera** (bukan galeri). Jam foto dipakai sebagai bukti waktu. Isi foto **tidak dinilai** (penilaian isi butuh ML, di luar cakupan proposal).

@@ -87,7 +87,7 @@ class DailyCardGenerator {
           0,
           (sum, task) => sum + (task['durationMinutes'] as int),
         ),
-        if (wellnessUat) 'activeMinutes': _activeMinutes(tasks),
+        if (wellnessUat) 'activeMinutes': activeMinutes(tasks),
         if (wellnessUat)
           'categoryUsage': categories.fold<int>(
             0,
@@ -119,7 +119,8 @@ class DailyCardGenerator {
     return cards;
   }
 
-  int _activeMinutes(List<JsonMap> tasks) => tasks.fold(
+  /// Card minutes that need moving, without sleep and water quests.
+  int activeMinutes(List<JsonMap> tasks) => tasks.fold(
     0,
     (sum, task) =>
         sum +
@@ -182,7 +183,7 @@ class DailyCardGenerator {
       ...card,
       'tasks': refreshed,
       if (card.containsKey('activeMinutes'))
-        'activeMinutes': _activeMinutes(refreshed),
+        'activeMinutes': activeMinutes(refreshed),
     };
   }
 
@@ -318,7 +319,7 @@ class DailyCardGenerator {
   }) {
     final rung = ladders[category]![step - 1];
     // Without background GPS (web app), walk/run counts session time.
-    final timed = timedWorkouts && rung.timedTitle != null;
+    final timed = rung.usesTimer(timed: timedWorkouts);
     // A meal window that has already passed gets the same-step anytime quest.
     final windowPassed =
         rung.photoWindows?.any((window) => window[1] <= hour) ?? false;
@@ -329,19 +330,13 @@ class DailyCardGenerator {
       'catalogId': 'ladder-${category.toLowerCase()}',
       'ladder': category,
       'step': step,
-      'title': timed
-          ? rung.timedTitle
-          : anytime
-          ? rung.anytimeTitle
-          : rung.title,
-      'description': timed
-          ? 'Dihitung dari lama sesi. Boleh kunci layar selama sesi.'
-          : anytime
+      'title': anytime ? rung.anytimeTitle : rung.titleFor(timed: timed),
+      'description': anytime
           ? 'Jam makannya sudah lewat, jadi hari ini cukup ini. Foto tiap porsinya.'
-          : rung.description,
+          : rung.descriptionFor(timed: timed),
       'category': category,
       'difficulty': step,
-      'durationMinutes': timed ? rung.timedMinutes : rung.durationMinutes,
+      'durationMinutes': rung.minutesFor(timed: timed),
       'xp': 15 + step * 5,
       'source': 'card',
       'status': 'available',

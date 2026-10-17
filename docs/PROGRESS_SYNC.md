@@ -102,11 +102,14 @@ ketika pending, offline, atau konflik; tidak memakai snackbar putih.
 
 ## Android ↔ web
 
-Kartu yang sudah di-commit tidak dibuat ulang atau dikonversi diam-diam.
-Misi berbasis waktu yang dibuat di web tetap dihitung dengan waktu di APK.
-Jika misi dibuat di APK dengan target GPS, web memakai GPS **foreground** dan
-meminta layar/halaman tetap terbuka. Tidak ada estimasi jarak dari durasi.
-Log menyimpan meter/durasi, bukan rute GPS.
+Kartu yang sudah di-commit tidak dibuat ulang. Satu pengecualian: misi
+jalan/lari yang **belum selesai** selalu mengikuti cara validasi perangkat
+yang membukanya (keputusan 17 Okt 2026). Web selalu memakai lama sesi karena
+browser tidak menghitung GPS di latar belakang; APK selalu memakai jarak GPS.
+Judul, target, dan menitnya diambil dari anak tangga yang sama, jadi posisi
+tangga untuk riset tidak berubah. Misi yang sudah selesai tetap seperti saat
+divalidasi. Tidak ada estimasi jarak dari durasi. Log menyimpan meter/durasi,
+bukan rute GPS.
 
 ## Checklist uji pada project nyata
 

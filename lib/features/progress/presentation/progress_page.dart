@@ -128,6 +128,7 @@ class ProgressPage extends StatelessWidget {
                   category: category,
                   entry: controller.capacity[category],
                   maxStep: controller.ladderMaximum(category),
+                  timed: controller.timedWorkouts,
                 ),
             ],
           ),
@@ -231,10 +232,12 @@ class _LadderRow extends StatelessWidget {
     required this.category,
     required this.entry,
     required this.maxStep,
+    required this.timed,
   });
   final String category;
   final Map<String, dynamic>? entry;
   final int maxStep;
+  final bool timed;
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +294,7 @@ class _LadderRow extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Sekarang: ${rung.title}',
+            'Sekarang: ${rung.titleFor(timed: timed)}',
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           if (entry?['reason'] != null)

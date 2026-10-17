@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/features/activity/presentation/activity_history_page.dart';
@@ -114,8 +113,6 @@ class ActivityPage extends StatelessWidget {
               ? 'Ada sesi yang belum disimpan. Ketuk untuk lanjut atau simpan.'
               : timed
               ? 'Dihitung dari waktu. Boleh kunci layar.'
-              : kIsWeb
-              ? 'Misi GPS dari APK. Biarkan layar dan halaman ini terbuka.'
               : 'Boleh kunci layar. Rute tidak disimpan.',
           quest: moveQuest,
           onTap: () => _open(context, WorkoutPage(controller: controller)),
@@ -151,10 +148,12 @@ class _HydrationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final goal = ((controller.profile?['waterGoal'] as num?) ?? 2000).toInt();
+    // One number: today's Hidrasi step, the same target as its quest.
+    final goal = controller.waterTarget;
+    final top = controller.waterTop;
     final water = controller.water.toInt();
     final quest = controller.quests
-        .where((task) => task['activityKind'] == 'water')
+        .where((task) => task['ladder'] == 'Lifestyle')
         .firstOrNull;
     return GameCard(
       child: Row(
@@ -189,7 +188,7 @@ class _HydrationCard extends StatelessWidget {
                   Text(
                     quest['status'] == 'completed'
                         ? 'Misi hidrasi selesai!'
-                        : 'Misi: ${quest['waterMl'] ?? goal} ml',
+                        : 'Misi hari ini',
                     style: TextStyle(
                       color: quest['status'] == 'completed'
                           ? c.success
@@ -197,6 +196,11 @@ class _HydrationCard extends StatelessWidget {
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
                     ),
+                  ),
+                if (goal < top)
+                  Text(
+                    'Puncak tangga: $top ml',
+                    style: TextStyle(color: c.muted, fontSize: 12),
                   ),
                 const SizedBox(height: 10),
                 FilledButton.icon(

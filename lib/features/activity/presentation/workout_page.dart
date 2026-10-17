@@ -399,10 +399,6 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
                   ? 'Di aplikasi web, misi jalan/lari dihitung dari lama sesi. '
                         'Setelah mulai, boleh kunci layar; waktunya tetap '
                         'berjalan. Berhenti jika pusing atau nyeri.'
-                  : kIsWeb
-                  ? 'Misi ini memakai jarak GPS dari kartu yang dibuat di APK. '
-                        'Biarkan halaman dan layar tetap terbuka; browser tidak '
-                        'menghitung GPS di latar belakang. Rute tidak disimpan.'
                   : 'Setelah mulai, boleh kunci layar atau buka aplikasi lain; '
                         'jarak tetap dihitung. Lokasi hanya dipakai selama sesi '
                         'dan rute tidak disimpan. Berhenti jika pusing atau nyeri.',
