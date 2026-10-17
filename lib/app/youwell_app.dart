@@ -95,9 +95,10 @@ class _YouWellAppState extends State<YouWellApp> {
   }
 
   Widget _buildApp() => MaterialApp(
+    // Short browser tab title, the same name as index.html and the manifest.
     title: _admin
         ? '${AppEnvironment.appName} Admin'
-        : '${AppEnvironment.appName} • Little steps, better days',
+        : AppEnvironment.appName,
     debugShowCheckedModeBanner: false,
     theme: _admin
         ? AppTheme.light

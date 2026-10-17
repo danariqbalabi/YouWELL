@@ -731,6 +731,7 @@ class _CardFront extends StatelessWidget {
                         color: palette.light.withValues(alpha: .35),
                       ),
                     ),
+                    // Long titles wrap to two lines instead of being cut.
                     child: Row(
                       children: [
                         Icon(
@@ -742,11 +743,12 @@ class _CardFront extends StatelessWidget {
                         Expanded(
                           child: Text(
                             task['title'].toString(),
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: context.colors.text,
                               fontSize: 13,
+                              height: 1.25,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

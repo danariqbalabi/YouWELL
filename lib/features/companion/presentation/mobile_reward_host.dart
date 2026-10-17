@@ -279,57 +279,83 @@ class _RewardOverlay extends StatelessWidget {
   }
 }
 
-/// Short burst of falling confetti for big moments (Hari Penuh, evolution).
-class _Confetti extends StatelessWidget {
+/// Burst of falling confetti for big moments (Hari Penuh, evolution).
+/// Painted straight from the animation, so no widget rebuilds per frame.
+class _Confetti extends StatefulWidget {
   const _Confetti();
+  @override
+  State<_Confetti> createState() => _ConfettiState();
+}
+
+class _ConfettiState extends State<_Confetti>
+    with SingleTickerProviderStateMixin {
+  late final _fall = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3200),
+  )..forward();
+
+  @override
+  void dispose() {
+    _fall.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final colors = [c.xp, c.primary, c.success, c.energy, c.lifestyle];
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 2200),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, _) =>
-          CustomPaint(painter: _ConfettiPainter(value, colors)),
+    return RepaintBoundary(
+      child: CustomPaint(
+        willChange: true,
+        painter: _ConfettiPainter(_fall, [
+          c.xp,
+          c.primary,
+          c.success,
+          c.energy,
+          c.lifestyle,
+        ]),
+      ),
     );
   }
 }
 
 class _ConfettiPainter extends CustomPainter {
-  _ConfettiPainter(this.t, this.colors);
-  final double t;
+  _ConfettiPainter(this.fall, this.colors) : super(repaint: fall);
+  final Animation<double> fall;
   final List<Color> colors;
+  final _paint = Paint();
 
   @override
   void paint(Canvas canvas, Size size) {
+    final t = fall.value;
+    if (t >= 1) return;
     final random = math.Random(7);
-    final paint = Paint();
+    final eased = Curves.easeOutQuad.transform(t);
     for (var i = 0; i < 46; i++) {
       final x = random.nextDouble() * size.width;
       final drift = (random.nextDouble() - .5) * 80;
-      final fall = size.height * (.15 + .7 * random.nextDouble());
-      final y = -20 + fall * t;
-      final spin = random.nextDouble() * math.pi * 2 + t * 8;
-      paint.color = colors[i % colors.length].withValues(
-        alpha: (1 - t * .8).clamp(0, 1),
+      final fallBy = size.height * (.25 + .8 * random.nextDouble());
+      final wobble = math.sin(t * 9 + i) * 10;
+      final spin = random.nextDouble() * math.pi * 2 + t * 7;
+      // Fade out only in the last third, so the burst does not just vanish.
+      _paint.color = colors[i % colors.length].withValues(
+        alpha: (1 - ((t - .66) / .34).clamp(0.0, 1.0)) * .95,
       );
       canvas.save();
-      canvas.translate(x + drift * t, y);
+      canvas.translate(x + drift * eased + wobble, -20 + fallBy * eased);
       canvas.rotate(spin);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           const Rect.fromLTWH(-4, -7, 8, 14),
           const Radius.circular(2),
         ),
-        paint,
+        _paint,
       );
       canvas.restore();
     }
   }
 
   @override
-  bool shouldRepaint(_ConfettiPainter old) => old.t != t;
+  bool shouldRepaint(_ConfettiPainter old) => old.colors != colors;
 }
 
 class _FullDayCelebration extends StatefulWidget {
@@ -343,10 +369,12 @@ class _FullDayCelebration extends StatefulWidget {
 
 class _FullDayCelebrationState extends State<_FullDayCelebration>
     with TickerProviderStateMixin {
-  // The ribbons draw in once, then keep a slow wave and a gliding sheen.
+  // One timeline for the entrance: ribbons draw in, then the trophy, text,
+  // XP and button arrive one after another. Afterwards the ribbons keep a
+  // slow wave and a gliding sheen.
   late final _intro = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1100),
+    duration: const Duration(milliseconds: 1900),
     value: widget.reduceMotion ? 1 : 0,
   );
   late final _flow = AnimationController(
@@ -370,11 +398,48 @@ class _FullDayCelebrationState extends State<_FullDayCelebration>
     super.dispose();
   }
 
+  /// Fades and lifts [child] in during [begin]–[end] of the entrance.
+  Widget _enter(
+    double begin,
+    double end,
+    Widget child, {
+    double rise = 18,
+    double fromScale = 1,
+    Curve curve = Curves.easeOutCubic,
+  }) {
+    final progress = CurvedAnimation(
+      parent: _intro,
+      curve: Interval(begin, end, curve: curve),
+    );
+    return AnimatedBuilder(
+      animation: progress,
+      child: child,
+      builder: (_, child) {
+        final v = progress.value;
+        return Opacity(
+          opacity: v.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, rise * (1 - v)),
+            child: Transform.scale(
+              scale: fromScale + (1 - fromScale) * v,
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final moment = widget.moment;
     const ink = Color(0xff0d1417);
+    final lines = [
+      if (moment.evolved) 'Temanmu tumbuh ke tahap baru',
+      ...moment.unlocks.map((name) => '$name terbuka'),
+      ...moment.badges.map((name) => 'Lencana: $name'),
+    ];
     return Material(
       color: ink,
       child: Stack(
@@ -382,6 +447,7 @@ class _FullDayCelebrationState extends State<_FullDayCelebration>
           Positioned.fill(
             child: RepaintBoundary(
               child: CustomPaint(
+                willChange: !widget.reduceMotion,
                 painter: _SwooshPainter(
                   c.primary,
                   c.xp,
@@ -400,49 +466,77 @@ class _FullDayCelebrationState extends State<_FullDayCelebration>
               child: Column(
                 children: [
                   const Spacer(),
-                  Icon(Icons.emoji_events_rounded, color: c.xp, size: 72),
+                  _enter(
+                    .12,
+                    .5,
+                    Icon(Icons.emoji_events_rounded, color: c.xp, size: 72),
+                    rise: 0,
+                    fromScale: .4,
+                    curve: Curves.easeOutBack,
+                  ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Kerja bagus!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 44,
-                      height: 1.05,
-                      fontWeight: FontWeight.w900,
+                  _enter(
+                    .28,
+                    .58,
+                    const Text(
+                      'Kerja bagus!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 44,
+                        height: 1.05,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'Semua misi hari ini selesai. Hari Penuh!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xffd7e3e8),
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
+                  _enter(
+                    .36,
+                    .66,
+                    const Text(
+                      'Semua misi hari ini selesai. Hari Penuh!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xffd7e3e8),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 18),
-                  XpPill(moment.xp, large: true),
-                  for (final line in [
-                    if (moment.evolved) 'Temanmu tumbuh ke tahap baru',
-                    ...moment.unlocks.map((name) => '$name terbuka'),
-                    ...moment.badges.map((name) => 'Lencana: $name'),
-                  ])
+                  _enter(
+                    .46,
+                    .78,
+                    XpPill(moment.xp, large: true),
+                    rise: 0,
+                    fromScale: .6,
+                    curve: Curves.easeOutBack,
+                  ),
+                  for (final (index, line) in lines.indexed)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        line,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
+                      child: _enter(
+                        (.56 + index * .06).clamp(0, .8),
+                        (.84 + index * .06).clamp(0, 1),
+                        Text(
+                          line,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
+                        rise: 10,
                       ),
                     ),
                   const Spacer(),
-                  ChunkyButton(
-                    label: 'Lanjut',
-                    onPressed: () => Navigator.of(context).pop(),
+                  _enter(
+                    .66,
+                    1,
+                    ChunkyButton(
+                      label: 'Lanjut',
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    rise: 24,
                   ),
                 ],
               ),
@@ -456,6 +550,7 @@ class _FullDayCelebrationState extends State<_FullDayCelebration>
 
 /// Two bold ribbons behind the celebration text. When [animated], they draw
 /// in along their length, then sway gently while a soft sheen glides along.
+/// No blur: a mask filter per frame stutters on the web renderer.
 class _SwooshPainter extends CustomPainter {
   _SwooshPainter(
     this.top,
@@ -467,6 +562,13 @@ class _SwooshPainter extends CustomPainter {
   final Color top, bottom;
   final Animation<double> intro, flow;
   final bool animated;
+  final _band = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round;
+  final _sheen = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..color = Colors.white.withValues(alpha: .16);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -495,13 +597,19 @@ class _SwooshPainter extends CustomPainter {
         w * 1.2,
         h * .7,
       );
-    final reveal = Curves.easeOutCubic.transform(intro.value);
-    // The bottom ribbon follows the top one a little later.
-    final revealBottom = Curves.easeOutCubic.transform(
-      ((intro.value - .2) / .8).clamp(0.0, 1.0),
+    // Top ribbon draws during the first 55% of the entrance, bottom after.
+    double reveal(double begin, double end) => Curves.easeInOutCubic.transform(
+      ((intro.value - begin) / (end - begin)).clamp(0.0, 1.0),
     );
-    _ribbon(canvas, topPath, top, width, reveal, flow.value);
-    _ribbon(canvas, bottomPath, bottom, width, revealBottom, flow.value + .5);
+    _ribbon(canvas, topPath, top, width, reveal(0, .5), flow.value);
+    _ribbon(
+      canvas,
+      bottomPath,
+      bottom,
+      width,
+      reveal(.12, .62),
+      flow.value + .5,
+    );
   }
 
   void _ribbon(
@@ -513,29 +621,27 @@ class _SwooshPainter extends CustomPainter {
     double sheenAt,
   ) {
     if (reveal <= 0) return;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
+    _band
       ..strokeWidth = width
       ..color = color;
+    if (reveal >= 1 && !animated) {
+      canvas.drawPath(path, _band);
+      return;
+    }
     for (final metric in path.computeMetrics()) {
-      final shown = metric.length * reveal;
-      canvas.drawPath(metric.extractPath(0, shown), paint);
+      canvas.drawPath(
+        reveal >= 1 ? path : metric.extractPath(0, metric.length * reveal),
+        _band,
+      );
       if (!animated || reveal < 1) continue;
       // A thin, faint highlight travelling along the ribbon's centre.
       final start = (sheenAt % 1) * metric.length * 1.3 - metric.length * .15;
-      final sheen = metric.extractPath(
-        start.clamp(0, metric.length),
-        (start + metric.length * .18).clamp(0, metric.length),
-      );
+      final from = start.clamp(0.0, metric.length);
+      final to = (start + metric.length * .18).clamp(0.0, metric.length);
+      if (to - from < 1) continue;
       canvas.drawPath(
-        sheen,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeWidth = width * .28
-          ..color = Colors.white.withValues(alpha: .22)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+        metric.extractPath(from, to),
+        _sheen..strokeWidth = width * .22,
       );
     }
   }
