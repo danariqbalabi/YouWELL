@@ -282,7 +282,14 @@ class _RewardOverlay extends StatelessWidget {
 /// Burst of falling confetti for big moments (Hari Penuh, evolution).
 /// Painted straight from the animation, so no widget rebuilds per frame.
 class _Confetti extends StatefulWidget {
-  const _Confetti();
+  const _Confetti({
+    this.delay = Duration.zero,
+    this.seed = 7,
+    this.pieces = 46,
+    this.duration = const Duration(milliseconds: 3200),
+  });
+  final Duration delay, duration;
+  final int seed, pieces;
   @override
   State<_Confetti> createState() => _ConfettiState();
 }
@@ -291,11 +298,25 @@ class _ConfettiState extends State<_Confetti>
     with SingleTickerProviderStateMixin {
   late final _fall = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 3200),
-  )..forward();
+    duration: widget.duration,
+  );
+  Timer? _start;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.delay == Duration.zero) {
+      _fall.forward();
+    } else {
+      _start = Timer(widget.delay, () {
+        if (mounted) _fall.forward();
+      });
+    }
+  }
 
   @override
   void dispose() {
+    _start?.cancel();
     _fall.dispose();
     super.dispose();
   }
@@ -306,7 +327,7 @@ class _ConfettiState extends State<_Confetti>
     return RepaintBoundary(
       child: CustomPaint(
         willChange: true,
-        painter: _ConfettiPainter(_fall, [
+        painter: _ConfettiPainter(_fall, widget.seed, widget.pieces, [
           c.xp,
           c.primary,
           c.success,
@@ -319,18 +340,20 @@ class _ConfettiState extends State<_Confetti>
 }
 
 class _ConfettiPainter extends CustomPainter {
-  _ConfettiPainter(this.fall, this.colors) : super(repaint: fall);
+  _ConfettiPainter(this.fall, this.seed, this.pieces, this.colors)
+    : super(repaint: fall);
   final Animation<double> fall;
+  final int seed, pieces;
   final List<Color> colors;
   final _paint = Paint();
 
   @override
   void paint(Canvas canvas, Size size) {
     final t = fall.value;
-    if (t >= 1) return;
-    final random = math.Random(7);
+    if (t <= 0 || t >= 1) return;
+    final random = math.Random(seed);
     final eased = Curves.easeOutQuad.transform(t);
-    for (var i = 0; i < 46; i++) {
+    for (var i = 0; i < pieces; i++) {
       final x = random.nextDouble() * size.width;
       final drift = (random.nextDouble() - .5) * 80;
       final fallBy = size.height * (.25 + .8 * random.nextDouble());
@@ -369,12 +392,12 @@ class _FullDayCelebration extends StatefulWidget {
 
 class _FullDayCelebrationState extends State<_FullDayCelebration>
     with TickerProviderStateMixin {
-  // One timeline for the entrance: ribbons draw in, then the trophy, text,
-  // XP and button arrive one after another. Afterwards the ribbons keep a
-  // slow wave and a gliding sheen.
+  // One timeline for the entrance (~3.6 s): ribbons draw in, rays open behind
+  // the trophy, then text, a counting XP pill and the button arrive one after
+  // another. Afterwards the ribbons sway, the rays turn and the trophy floats.
   late final _intro = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1900),
+    duration: const Duration(milliseconds: 3600),
     value: widget.reduceMotion ? 1 : 0,
   );
   late final _flow = AnimationController(
@@ -458,26 +481,86 @@ class _FullDayCelebrationState extends State<_FullDayCelebration>
               ),
             ),
           ),
-          if (!widget.reduceMotion)
-            const Positioned.fill(child: IgnorePointer(child: _Confetti())),
+          if (!widget.reduceMotion) ...[
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: _Confetti(
+                  delay: Duration(milliseconds: 500),
+                  pieces: 56,
+                  duration: Duration(milliseconds: 4200),
+                ),
+              ),
+            ),
+            // A second, lighter wave as the XP lands.
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: _Confetti(
+                  delay: Duration(milliseconds: 1900),
+                  seed: 21,
+                  pieces: 34,
+                  duration: Duration(milliseconds: 4600),
+                ),
+              ),
+            ),
+          ],
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
                   const Spacer(),
-                  _enter(
-                    .12,
-                    .5,
-                    Icon(Icons.emoji_events_rounded, color: c.xp, size: 72),
-                    rise: 0,
-                    fromScale: .4,
-                    curve: Curves.easeOutBack,
+                  SizedBox(
+                    width: 200,
+                    height: 150,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned.fill(
+                          child: RepaintBoundary(
+                            child: CustomPaint(
+                              willChange: !widget.reduceMotion,
+                              painter: _TrophyRaysPainter(
+                                c.xp,
+                                intro: _intro,
+                                flow: _flow,
+                                animated: !widget.reduceMotion,
+                              ),
+                            ),
+                          ),
+                        ),
+                        _enter(
+                          .16,
+                          .4,
+                          AnimatedBuilder(
+                            animation: _flow,
+                            child: Icon(
+                              Icons.emoji_events_rounded,
+                              color: c.xp,
+                              size: 84,
+                            ),
+                            // Three whole bobs per loop: no jump on repeat.
+                            builder: (_, child) => Transform.translate(
+                              offset: Offset(
+                                0,
+                                widget.reduceMotion
+                                    ? 0
+                                    : math.sin(_flow.value * math.pi * 6) * 4,
+                              ),
+                              child: child,
+                            ),
+                          ),
+                          rise: 0,
+                          fromScale: .2,
+                          curve: Curves.elasticOut,
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 4),
                   _enter(
-                    .28,
-                    .58,
+                    .32,
+                    .5,
                     const Text(
                       'Kerja bagus!',
                       textAlign: TextAlign.center,
@@ -491,8 +574,8 @@ class _FullDayCelebrationState extends State<_FullDayCelebration>
                   ),
                   const SizedBox(height: 10),
                   _enter(
-                    .36,
-                    .66,
+                    .4,
+                    .58,
                     const Text(
                       'Semua misi hari ini selesai. Hari Penuh!',
                       textAlign: TextAlign.center,
@@ -505,19 +588,30 @@ class _FullDayCelebrationState extends State<_FullDayCelebration>
                   ),
                   const SizedBox(height: 18),
                   _enter(
-                    .46,
-                    .78,
-                    XpPill(moment.xp, large: true),
+                    .5,
+                    .66,
+                    // The XP counts up once the pill has landed.
+                    AnimatedBuilder(
+                      animation: _intro,
+                      builder: (_, _) => XpPill(
+                        (moment.xp *
+                                Curves.easeOutCubic.transform(
+                                  ((_intro.value - .54) / .26).clamp(0.0, 1.0),
+                                ))
+                            .round(),
+                        large: true,
+                      ),
+                    ),
                     rise: 0,
-                    fromScale: .6,
+                    fromScale: .5,
                     curve: Curves.easeOutBack,
                   ),
                   for (final (index, line) in lines.indexed)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: _enter(
-                        (.56 + index * .06).clamp(0, .8),
-                        (.84 + index * .06).clamp(0, 1),
+                        (.66 + index * .05).clamp(0, .85),
+                        (.8 + index * .05).clamp(0, 1),
                         Text(
                           line,
                           style: const TextStyle(
@@ -530,7 +624,7 @@ class _FullDayCelebrationState extends State<_FullDayCelebration>
                     ),
                   const Spacer(),
                   _enter(
-                    .66,
+                    .82,
                     1,
                     ChunkyButton(
                       label: 'Lanjut',
@@ -601,13 +695,13 @@ class _SwooshPainter extends CustomPainter {
     double reveal(double begin, double end) => Curves.easeInOutCubic.transform(
       ((intro.value - begin) / (end - begin)).clamp(0.0, 1.0),
     );
-    _ribbon(canvas, topPath, top, width, reveal(0, .5), flow.value);
+    _ribbon(canvas, topPath, top, width, reveal(0, .36), flow.value);
     _ribbon(
       canvas,
       bottomPath,
       bottom,
       width,
-      reveal(.12, .62),
+      reveal(.08, .44),
       flow.value + .5,
     );
   }
@@ -649,4 +743,83 @@ class _SwooshPainter extends CustomPainter {
   @override
   bool shouldRepaint(_SwooshPainter old) =>
       old.top != top || old.bottom != bottom || old.animated != animated;
+}
+
+/// Soft glow, slowly turning rays and twinkles behind the trophy. The rays
+/// open with the trophy, then turn one ray-gap per loop so repeats are seamless.
+class _TrophyRaysPainter extends CustomPainter {
+  _TrophyRaysPainter(
+    this.color, {
+    required this.intro,
+    required this.flow,
+    required this.animated,
+  }) : super(repaint: Listenable.merge([intro, flow]));
+  final Color color;
+  final Animation<double> intro, flow;
+  final bool animated;
+  static const _rays = 12;
+  final _paint = Paint();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final open = Curves.easeOutCubic.transform(
+      ((intro.value - .14) / .3).clamp(0.0, 1.0),
+    );
+    if (open <= 0) return;
+    final center = size.center(Offset.zero);
+    final phase = animated ? flow.value : 0.0;
+    final pulse = animated ? (math.sin(phase * math.pi * 4) + 1) / 2 : .5;
+    final radius = size.shortestSide * .62 * open;
+
+    _paint.shader = RadialGradient(
+      colors: [
+        color.withValues(alpha: (.34 + .12 * pulse) * open),
+        color.withValues(alpha: 0),
+      ],
+    ).createShader(Rect.fromCircle(center: center, radius: radius));
+    canvas.drawCircle(center, radius, _paint);
+    _paint.shader = null;
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(phase * math.pi * 2 / _rays);
+    _paint.color = color.withValues(alpha: .13 * open);
+    final ray = Path()
+      ..moveTo(0, 0)
+      ..lineTo(radius * 1.25, -radius * .11)
+      ..lineTo(radius * 1.25, radius * .11)
+      ..close();
+    for (var i = 0; i < _rays; i++) {
+      canvas.drawPath(ray, _paint);
+      canvas.rotate(math.pi * 2 / _rays);
+    }
+    canvas.restore();
+
+    // Four twinkles that fade in and out at their own moments.
+    for (var i = 0; i < 4; i++) {
+      final at = (phase * 2 + i / 4) % 1;
+      final glow = animated ? math.sin(at * math.pi) : .6;
+      final angle = -math.pi * .85 + i * math.pi * .56;
+      final spot =
+          center + Offset(math.cos(angle), math.sin(angle) * .7) * radius * .8;
+      _star(canvas, spot, (5 + 4 * glow) * open, glow * open);
+    }
+  }
+
+  void _star(Canvas canvas, Offset at, double r, double alpha) {
+    if (alpha <= .02) return;
+    _paint.color = Colors.white.withValues(alpha: .9 * alpha);
+    final star = Path()
+      ..moveTo(at.dx, at.dy - r)
+      ..quadraticBezierTo(at.dx, at.dy, at.dx + r, at.dy)
+      ..quadraticBezierTo(at.dx, at.dy, at.dx, at.dy + r)
+      ..quadraticBezierTo(at.dx, at.dy, at.dx - r, at.dy)
+      ..quadraticBezierTo(at.dx, at.dy, at.dx, at.dy - r)
+      ..close();
+    canvas.drawPath(star, _paint);
+  }
+
+  @override
+  bool shouldRepaint(_TrophyRaysPainter old) =>
+      old.color != color || old.animated != animated;
 }
