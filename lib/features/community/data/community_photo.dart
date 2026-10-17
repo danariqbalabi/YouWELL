@@ -9,26 +9,27 @@ const maxCommunityPhotoBytes = 3 * 1024 * 1024;
 /// pixels, so EXIF metadata such as GPS location never leaves the phone.
 /// The longest side is capped and shrunk further until the file fits.
 Future<Uint8List> prepareCommunityPhoto(Uint8List original) async {
+  // Read the size from a decoded frame: ImageDescriptor.width/height throw
+  // UnsupportedError on the web, which made every web photo fail here.
+  final probe = await ui.instantiateImageCodec(original);
+  final first = await probe.getNextFrame();
+  final width = first.image.width, height = first.image.height;
+  first.image.dispose();
+  probe.dispose();
   for (final side in const [1080, 860, 640, 480]) {
-    final buffer = await ui.ImmutableBuffer.fromUint8List(original);
-    final descriptor = await ui.ImageDescriptor.encoded(buffer);
-    try {
-      final scale = side / max(descriptor.width, descriptor.height);
-      final codec = await descriptor.instantiateCodec(
-        targetWidth: scale < 1 ? (descriptor.width * scale).round() : null,
-        targetHeight: scale < 1 ? (descriptor.height * scale).round() : null,
-      );
-      final frame = await codec.getNextFrame();
-      final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
-      frame.image.dispose();
-      codec.dispose();
-      if (data == null) break;
-      final bytes = data.buffer.asUint8List();
-      if (bytes.length <= maxCommunityPhotoBytes) return bytes;
-    } finally {
-      descriptor.dispose();
-      buffer.dispose();
-    }
+    final scale = side / max(width, height);
+    final codec = await ui.instantiateImageCodec(
+      original,
+      targetWidth: scale < 1 ? (width * scale).round() : null,
+      targetHeight: scale < 1 ? (height * scale).round() : null,
+    );
+    final frame = await codec.getNextFrame();
+    final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    frame.image.dispose();
+    codec.dispose();
+    if (data == null) break;
+    final bytes = data.buffer.asUint8List();
+    if (bytes.length <= maxCommunityPhotoBytes) return bytes;
   }
   throw const FormatException('Foto terlalu besar untuk diunggah.');
 }

@@ -463,9 +463,21 @@ class _ComposeDialogState extends State<_ComposeDialog> {
       setState(() => _busy = true);
       final photo = await prepareCommunityPhoto(await picked.readAsBytes());
       if (mounted) setState(() => _photo = photo);
-    } catch (_) {
+    } on FormatException {
       if (mounted) {
-        setState(() => _error = 'Foto belum bisa dipakai. Coba foto lain.');
+        setState(
+          () => _error =
+              'Foto terlalu besar meski sudah diperkecil. '
+              'Coba foto lain.',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Foto belum bisa dipakai di perangkat ini '
+              '(${error.runtimeType}). Coba foto lain.',
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -577,6 +589,8 @@ class _ComposeDialogState extends State<_ComposeDialog> {
                     ? 'Hari ini aku berhasil…'
                     : 'Tulis keterangan (opsional)',
                 errorText: _error,
+                // Server reasons can be long; never cut them off.
+                errorMaxLines: 5,
               ),
             ),
           ],

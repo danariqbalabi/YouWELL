@@ -70,9 +70,36 @@ class SupabaseCommunityStore implements CommunityStore {
     '42501' => 'Akses ini butuh akun admin dengan verifikasi dua langkah.',
     '22023' when error.message.contains('Photo') =>
       'Foto belum terunggah. Coba kirim lagi.',
+    // The app calls submit_youwell_post(text, text) from the phase 5
+    // migration; an older server only has the one-argument version.
+    'PGRST202' || '42883' =>
+      'Server Community belum mendukung foto. Admin perlu menjalankan '
+          'migration Supabase terbaru.',
     '22023' => 'Tulis 3–$maxCommunityPostLength karakter, atau tambahkan foto.',
     _ => 'Community belum terhubung. Periksa koneksi lalu coba lagi.',
   };
+
+  /// Names the server's reason, so a setup gap is not mistaken for a
+  /// connection problem.
+  static String storageMessage(StorageException error) {
+    final text = '${error.message} ${error.error ?? ''}'.toLowerCase();
+    return switch (error.statusCode) {
+      _ when text.contains('bucket not found') =>
+        'Penyimpanan foto belum disiapkan di server (bucket "community" '
+            'belum ada). Admin perlu menjalankan migration Supabase tahap 5.',
+      '413' => 'Foto terlalu besar untuk server. Coba foto lain.',
+      '415' => 'Format foto ditolak server. Coba foto lain.',
+      '401' => 'Sesi login berakhir. Keluar lalu masuk lagi.',
+      '400' || '403'
+          when text.contains('row-level security') ||
+              text.contains('unauthorized') =>
+        'Server belum mengizinkan unggah foto. Admin perlu menjalankan '
+            'migration Supabase tahap 5.',
+      _ =>
+        'Foto belum bisa diunggah (${error.statusCode ?? 'tanpa kode'}: '
+            '${error.message}).',
+    };
+  }
 
   /// Adds a signed link to every post with a photo. A failed link only
   /// hides that photo; the posts still load.
@@ -121,6 +148,8 @@ class SupabaseCommunityStore implements CommunityStore {
               photo,
               fileOptions: const FileOptions(contentType: 'image/png'),
             );
+      } on StorageException catch (error) {
+        throw CommunityException(storageMessage(error));
       } catch (_) {
         throw const CommunityException(
           'Foto belum bisa diunggah. Periksa koneksi lalu coba lagi.',
