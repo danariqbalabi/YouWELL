@@ -119,7 +119,7 @@ class ReductionProgress extends StatelessWidget {
               '${row['day']} · ${nicotineProductLabels[row['product']] ?? 'Arsip Habit Swap'}',
             ),
             subtitle: Text(
-              '${reductionTriggerLabels[row['trigger']] ?? 'Pemicu belum dicatat'}\n'
+              '${triggerText(row) ?? 'Pemicu belum dicatat'}\n'
               '${swapActivityLabels[row['activity']] ?? row['swap'] ?? 'Belum mencoba'}\n'
               '${swapOutcomeLabels[row['outcome']] ?? 'Hasil belum dicatat'}',
             ),

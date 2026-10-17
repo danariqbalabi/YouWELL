@@ -144,7 +144,7 @@ void main() {
       expect(find.byIcon(Icons.timer_outlined), findsNothing);
       await tester.tap(find.text('Setelah makan'));
       await tester.scrollUntilVisible(
-        find.text('Jalan santai sebentar'),
+        find.text('Jalan santai'),
         150,
         scrollable: find
             .descendant(
@@ -154,9 +154,9 @@ void main() {
             .first,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Jalan santai sebentar'));
+      await tester.tap(find.text('Jalan santai'));
       await tester.scrollUntilVisible(
-        find.text('Sudah mencoba, tetap merokok'),
+        find.text('Sudah coba, tetap merokok'),
         150,
         scrollable: find
             .descendant(
@@ -166,9 +166,9 @@ void main() {
             .first,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Sudah mencoba, tetap merokok'));
+      await tester.tap(find.text('Sudah coba, tetap merokok'));
       await tester.scrollUntilVisible(
-        find.text('Simpan catatan momen'),
+        find.text('Simpan momen'),
         150,
         scrollable: find
             .descendant(
@@ -178,13 +178,11 @@ void main() {
             .first,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Simpan catatan momen'));
+      await tester.tap(find.text('Simpan momen'));
       await tester.pump();
 
       expect(
-        find.text(
-          'Catatan tersimpan. Terima kasih sudah mencatat dengan jujur.',
-        ),
+        find.text('Momen tercatat. Terima kasih sudah jujur!'),
         findsOneWidget,
       );
       expect(controller.habitDelays, isEmpty);

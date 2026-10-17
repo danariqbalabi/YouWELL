@@ -40,6 +40,7 @@ abstract final class CloudProgress {
     // Raw smoking/vaping data stays on the device (CLAUDE.md §6).
     'product',
     'trigger',
+    'triggers',
     'outcome',
     'activity',
     'activities',
@@ -162,6 +163,7 @@ abstract final class CloudProgress {
                   'eventId',
                   'product',
                   'trigger',
+                  'triggers',
                   'activity',
                   'activities',
                   'outcome',

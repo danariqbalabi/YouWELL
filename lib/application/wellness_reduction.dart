@@ -32,12 +32,13 @@ extension ReductionSupport on WellnessController {
 
   /// Idempotency is per submitted moment, not an arbitrary ten-minute lock.
   /// A tried activity earns the daily quest equally for either honest outcome.
-  /// [activities] lists every activity tried (several may be picked);
-  /// [activity] alone is the single-choice form older callers use.
+  /// [activities] and [triggers] list every pick (several may be chosen);
+  /// [activity] and [trigger] alone are the single-choice form.
   bool recordHabitSwap({
     required String eventId,
     required String product,
-    required String trigger,
+    String trigger = '',
+    List<String> triggers = const [],
     String activity = '',
     List<String> activities = const [],
     required String outcome,
@@ -45,6 +46,7 @@ extension ReductionSupport on WellnessController {
     final tried = outcome == 'not_tried'
         ? const <String>[]
         : {...activities, if (activity.isNotEmpty) activity}.toList();
+    final causes = {...triggers, if (trigger.isNotEmpty) trigger}.toList();
     if ((!reduction && !hasOpenHabitSwapMission) ||
         uatProgramComplete ||
         eventId.isEmpty ||
@@ -52,7 +54,8 @@ extension ReductionSupport on WellnessController {
         !const ['cigarette', 'vape'].contains(product) ||
         (nicotineProduct != null &&
             !productsFor(nicotineProduct).contains(product)) ||
-        !triggersFor(product).contains(trigger) ||
+        causes.isEmpty ||
+        !causes.every(triggersFor(product).contains) ||
         !swapOutcomeLabels.containsKey(outcome) ||
         (outcome != 'not_tried' &&
             (tried.isEmpty ||
@@ -63,7 +66,8 @@ extension ReductionSupport on WellnessController {
     _add('habitSwaps', {
       'eventId': eventId,
       'product': product,
-      'trigger': trigger,
+      'trigger': causes.first,
+      if (causes.length > 1) 'triggers': causes,
       'activity': tried.firstOrNull,
       if (tried.length > 1) 'activities': tried,
       'swap': tried.isEmpty
@@ -98,16 +102,19 @@ extension ReductionSupport on WellnessController {
     return value is Map ? Map<String, dynamic>.from(value) : null;
   }
 
-  bool setSwapPlan(String product, String trigger, String activity) {
+  /// [triggers]: the first is kept as `trigger` for older readers.
+  bool setSwapPlan(String product, List<String> triggers, String activity) {
     if (!reduction ||
         uatProgramComplete ||
         !productsFor(nicotineProduct).contains(product) ||
-        !triggersFor(product).contains(trigger) ||
+        triggers.isEmpty ||
+        !triggers.every(triggersFor(product).contains) ||
         !swapActivityLabels.containsKey(activity)) {
       return false;
     }
     (_data['reductionPlans'] ??= <String, dynamic>{})[product] = {
-      'trigger': trigger,
+      'trigger': triggers.first,
+      if (triggers.length > 1) 'triggers': triggers,
       'activity': activity,
       'chosenOn': today,
     };

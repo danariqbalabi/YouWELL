@@ -69,7 +69,7 @@ class ReductionSupportPage extends StatelessWidget {
                     : const Padding(
                         padding: EdgeInsets.all(22),
                         child: Text(
-                          'Misi Habit Swap sudah dicatat. Kamu bisa kembali ke Hari ini.',
+                          'Misi Habit Swap sudah tercatat.',
                         ),
                       ))
               : controller.nicotineProduct == null &&
@@ -83,8 +83,7 @@ class ReductionSupportPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Rokok dicatat dalam batang. Vape dicatat dalam sesi. '
-                      'Jika memakai keduanya, catat masing-masing secara terpisah.',
+                      'Rokok dihitung per batang, vape per sesi.',
                     ),
                     const SizedBox(height: 20),
                     for (final entry in nicotineProductLabels.entries)
@@ -192,7 +191,7 @@ class ReductionEntryCard extends StatelessWidget {
           Text(
             controller.uatProgramComplete
                 ? 'Perjalanan 28 hari selesai. Lihat kembali catatan dan rekapmu.'
-                : 'Saat ingin merokok/vape, catat pemicunya dan coba satu pengganti.',
+                : 'Lagi ingin merokok/vape? Coba satu pengganti, lalu catat.',
             style: TextStyle(color: c.muted),
           ),
           const SizedBox(height: 12),

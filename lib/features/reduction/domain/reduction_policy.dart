@@ -8,26 +8,26 @@ const nicotineProductLabels = {
 };
 const reductionTriggerLabels = {
   'after_meal': 'Setelah makan',
-  'coffee': 'Saat minum kopi',
-  'screen': 'Saat main HP / game',
-  'boredom': 'Sedang bosan',
-  'stress': 'Sedang tertekan',
+  'coffee': 'Minum kopi',
+  'screen': 'Main HP / game',
+  'boredom': 'Bosan',
+  'stress': 'Tertekan',
   'social': 'Bersama teman',
   'wakeup': 'Setelah bangun',
-  'other': 'Momen lain',
+  'other': 'Lainnya',
 };
 const swapActivityLabels = {
-  'walk': 'Jalan santai sebentar',
-  'seated': 'Gerak ringan sambil duduk',
-  'hands': 'Sibukkan tangan dengan aktivitas lain',
+  'walk': 'Jalan santai',
+  'seated': 'Gerak sambil duduk',
+  'hands': 'Sibukkan tangan',
   'water': 'Minum segelas air',
-  'breathing': 'Tarik napas perlahan',
+  'breathing': 'Tarik napas pelan',
   'contact': 'Hubungi teman',
 };
 const swapOutcomeLabels = {
-  'skipped': 'Melewatkan rokok / vape pada momen ini',
-  'used': 'Sudah mencoba, tetap merokok / vape',
-  'not_tried': 'Belum mencoba aktivitas pengganti',
+  'skipped': 'Tidak jadi merokok / vape',
+  'used': 'Sudah coba, tetap merokok / vape',
+  'not_tried': 'Belum coba pengganti',
 };
 
 List<String> productsFor(String? choice) => switch (choice) {
@@ -116,15 +116,32 @@ class ConsumptionWeek {
   }
 }
 
+/// Every trigger of a moment; older rows keep a single `trigger`.
+List<String> momentTriggers(Map row) => [
+  ...?(row['triggers'] as List?)?.whereType<String>(),
+  if (row['triggers'] is! List && row['trigger'] is String)
+    row['trigger'] as String,
+];
+
+/// "Setelah makan, Ngopi" for a moment or plan, or null if none is known.
+String? triggerText(Map row) {
+  final labels = [
+    for (final key in momentTriggers(row)) ?reductionTriggerLabels[key],
+  ];
+  return labels.isEmpty ? null : labels.join(', ');
+}
+
 /// Explainable suggestions: movement first, seated movement for low-impact;
 /// a tried strategy may lead after two matched reports that skipped the moment
 /// (REDUCTION_UAT: "dua laporan cocok ... dengan hasil melewatkan").
 List<String> suggestedSwaps({
   required bool lowImpact,
   required String product,
-  required String trigger,
+  String trigger = '',
+  List<String> triggers = const [],
   required List<JsonMap> history,
 }) {
+  final picked = {...triggers, if (trigger.isNotEmpty) trigger};
   final order = lowImpact
       ? ['seated', 'hands', 'water', 'breathing', 'contact', 'walk']
       : ['walk', 'seated', 'hands', 'water', 'breathing', 'contact'];
@@ -132,7 +149,7 @@ List<String> suggestedSwaps({
     final matches = history.where(
       (row) =>
           row['product'] == product &&
-          row['trigger'] == trigger &&
+          momentTriggers(row).any(picked.contains) &&
           (row['activity'] == activity ||
               (row['activities'] as List?)?.contains(activity) == true) &&
           isSwapAttempt(row),

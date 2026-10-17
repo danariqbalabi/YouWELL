@@ -25,8 +25,10 @@ Timer jeda, kenaikan durasi menunggu, dan lencana menit ditunda dihapus.
 
 - Jenis penggunaan: rokok / vape / keduanya. Setiap momen hanya satu jenis.
 - Pemicu sama-sama tersedia, urutan berbeda: rokok mulai dari setelah makan
-  dan kopi; vape mulai dari layar/game dan bosan. Pengguna boleh menyimpan
-  satu rencana pemicu–aktivitas per jenis tanpa dianggap sudah melakukannya.
+  dan kopi; vape mulai dari layar/game dan bosan. Satu momen boleh punya
+  lebih dari satu pemicu (keputusan 17 Okt 2026), sama seperti aktivitas.
+  Pengguna boleh menyimpan satu rencana pemicu–aktivitas per jenis tanpa
+  dianggap sudah melakukannya.
 - Hasil: melewatkan momen, sudah mencoba tetapi tetap menggunakan, atau belum
   mencoba. Dua hasil mencoba memerlukan aktivitas dan menyelesaikan misi
   latihan dengan XP sama. Belum mencoba tersimpan tanpa menyelesaikan misi.
