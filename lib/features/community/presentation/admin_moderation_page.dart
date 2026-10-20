@@ -58,6 +58,41 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
     if (mounted) setState(() => _busy = false);
   }
 
+  /// Deleting cannot be undone, so it always asks first.
+  Future<void> _delete(CommunityPost post) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hapus post ini?'),
+        content: Text(
+          'Post @${post.alias} dihapus permanen beserta foto, reaksi, dan '
+          'laporannya. Tindakan ini tidak bisa dibatalkan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _act(() => _store.adminDeletePost(post.id));
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Post dihapus.')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final queue = _queue;
@@ -107,6 +142,7 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
             _Summary(
               pending: queue.pending.length,
               reports: queue.reports.length,
+              published: queue.published.length,
             ),
             const SizedBox(height: 24),
             const Text(
@@ -126,6 +162,7 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
                     _act(() => _store.moderate(post.id, approve: true)),
                 onReject: () =>
                     _act(() => _store.moderate(post.id, approve: false)),
+                onDelete: () => _delete(post),
               ),
             const SizedBox(height: 24),
             const Text(
@@ -152,6 +189,26 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
                     await _act(() => _store.resolveReport(report.id));
                   }
                 },
+                onDelete: () => _delete(report.post),
+              ),
+            const SizedBox(height: 24),
+            const Text(
+              'Sudah tayang',
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '100 post terbaru yang sudah disetujui.',
+              style: TextStyle(color: context.colors.muted),
+            ),
+            const SizedBox(height: 12),
+            if (queue.published.isEmpty)
+              const _Empty(message: 'Belum ada post yang tayang.'),
+            for (final post in queue.published)
+              _ModerationCard(
+                post: post,
+                busy: _busy,
+                onDelete: () => _delete(post),
               ),
           ],
         ],
@@ -161,8 +218,12 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
 }
 
 class _Summary extends StatelessWidget {
-  const _Summary({required this.pending, required this.reports});
-  final int pending, reports;
+  const _Summary({
+    required this.pending,
+    required this.reports,
+    required this.published,
+  });
+  final int pending, reports, published;
   @override
   Widget build(BuildContext context) => Row(
     children: [
@@ -172,6 +233,10 @@ class _Summary extends StatelessWidget {
       const SizedBox(width: 12),
       Expanded(
         child: _Number(value: '$reports', label: 'Laporan'),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: _Number(value: '$published', label: 'Tayang'),
       ),
     ],
   );
@@ -209,17 +274,18 @@ class _ModerationCard extends StatelessWidget {
   const _ModerationCard({
     required this.post,
     required this.busy,
-    required this.approveLabel,
-    required this.rejectLabel,
-    required this.onApprove,
-    required this.onReject,
+    required this.onDelete,
+    this.approveLabel,
+    this.rejectLabel,
+    this.onApprove,
+    this.onReject,
     this.label,
   });
   final CommunityPost post;
   final bool busy;
-  final String approveLabel, rejectLabel;
-  final String? label;
-  final VoidCallback onApprove, onReject;
+  final String? approveLabel, rejectLabel, label;
+  final VoidCallback? onApprove, onReject;
+  final VoidCallback onDelete;
   @override
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(bottom: 12),
@@ -262,15 +328,25 @@ class _ModerationCard extends StatelessWidget {
           spacing: 10,
           runSpacing: 8,
           children: [
-            FilledButton.icon(
-              onPressed: busy ? null : onApprove,
-              icon: const Icon(Icons.check_rounded),
-              label: Text(approveLabel),
-            ),
-            OutlinedButton.icon(
-              onPressed: busy ? null : onReject,
-              icon: const Icon(Icons.close_rounded),
-              label: Text(rejectLabel),
+            if (onApprove != null)
+              FilledButton.icon(
+                onPressed: busy ? null : onApprove,
+                icon: const Icon(Icons.check_rounded),
+                label: Text(approveLabel ?? 'Setujui'),
+              ),
+            if (onReject != null)
+              OutlinedButton.icon(
+                onPressed: busy ? null : onReject,
+                icon: const Icon(Icons.close_rounded),
+                label: Text(rejectLabel ?? 'Tolak'),
+              ),
+            TextButton.icon(
+              onPressed: busy ? null : onDelete,
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('Hapus'),
             ),
           ],
         ),

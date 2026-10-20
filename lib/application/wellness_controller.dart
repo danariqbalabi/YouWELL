@@ -1208,14 +1208,16 @@ class WellnessController extends ChangeNotifier {
   }
 
   /// Own posts only; seed examples and other aliases stay.
-  void deleteCommunityPost(String id) {
+  /// Authors delete their own post; [asAdmin] (moderation preview) any real
+  /// post. The built-in sample posts are constants and cannot be deleted.
+  void deleteCommunityPost(String id, {bool asAdmin = false}) {
     final posts = _data['communityPosts'] as List;
     final count = posts.length;
     posts.removeWhere(
       (post) =>
           post['id'] == id &&
           post['sample'] != true &&
-          post['alias'] == profile?['alias'],
+          (asAdmin || post['alias'] == profile?['alias']),
     );
     if (posts.length == count) return;
     (_data['communityReactions'] as List).removeWhere(

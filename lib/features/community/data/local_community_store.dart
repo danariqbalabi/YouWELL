@@ -70,6 +70,13 @@ class LocalCommunityStore implements CommunityStore {
   @override
   Future<ModerationQueue> moderationQueue() async => ModerationQueue(
     pending: controller.moderationQueue.map(_post).toList(),
+    published: [
+      for (final row in [...controller.communityPosts]..sort(
+        (a, b) => b['time'].toString().compareTo(a['time'].toString()),
+      ))
+        // Built-in samples are not real posts, so there is nothing to delete.
+        if (row['status'] == 'approved' && row['sample'] != true) _post(row),
+    ],
     reports: [
       for (final report in controller.communityReports)
         if (controller.communityPosts
@@ -99,4 +106,8 @@ class LocalCommunityStore implements CommunityStore {
   @override
   Future<void> deletePost(String postId) async =>
       controller.deleteCommunityPost(postId);
+
+  @override
+  Future<void> adminDeletePost(String postId) async =>
+      controller.deleteCommunityPost(postId, asAdmin: true);
 }

@@ -72,6 +72,10 @@ nama panggilan yang diganti dan nama companion, membolehkan pembuat menghapus
 post-nya, serta menyimpan kode peserta P1–P10 yang diberikan admin di Dashboard
 peneliti. **Jalankan tahap 6 sebelum memasang build app terbaru**, karena build
 itu mengirim nama companion yang ditolak server versi lama.
+Tahap 7 (`20261020090000_admin_post_delete.sql`) membolehkan admin ber-MFA
+menghapus post apa pun, termasuk yang sudah tayang, beserta foto, reaksi, dan
+laporannya. Antrean moderasi kini juga memuat 100 post tayang terbaru di
+bagian **Sudah tayang**. Jalankan sebelum memakai build admin terbaru.
 Schema `private` tidak boleh ditambahkan ke daftar exposed schemas.
 
 Tabel `public.youwell_profiles` memakai RLS pemilik (`auth.uid() = user_id`)

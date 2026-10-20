@@ -72,6 +72,9 @@ class SupabaseCommunityStore implements CommunityStore {
       'Foto belum terunggah. Coba kirim lagi.',
     // The app calls submit_youwell_post(text, text) from the phase 5
     // migration; an older server only has the one-argument version.
+    'PGRST202' || '42883' when error.message.contains('admin_delete') =>
+      'Server belum mendukung hapus post oleh admin. Jalankan migration '
+          'Supabase tahap 7.',
     'PGRST202' || '42883' =>
       'Server Community belum mendukung foto. Admin perlu menjalankan '
           'migration Supabase terbaru.',
@@ -203,8 +206,14 @@ class SupabaseCommunityStore implements CommunityStore {
       for (final row in reportRows)
         CommunityPost.fromJson({...row, 'id': row['post_id']}),
     ]);
+    final published = await _withImages([
+      for (final row
+          in ((value['published'] ?? const []) as List).whereType<Map>())
+        CommunityPost.fromJson(row),
+    ]);
     return ModerationQueue(
       pending: pending,
+      published: published,
       reports: [
         for (final (index, row) in reportRows.indexed)
           CommunityReport(
@@ -234,6 +243,14 @@ class SupabaseCommunityStore implements CommunityStore {
   @override
   Future<void> deletePost(String postId) async {
     final photo = await _call<Object?>('delete_youwell_post', {
+      'p_post': postId,
+    });
+    if (photo is String) await _remove(photo);
+  }
+
+  @override
+  Future<void> adminDeletePost(String postId) async {
+    final photo = await _call<Object?>('admin_delete_youwell_post', {
       'p_post': postId,
     });
     if (photo is String) await _remove(photo);

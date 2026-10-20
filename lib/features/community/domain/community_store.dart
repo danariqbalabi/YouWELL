@@ -76,9 +76,17 @@ class CommunityReport {
 }
 
 class ModerationQueue {
-  const ModerationQueue({required this.pending, required this.reports});
+  const ModerationQueue({
+    required this.pending,
+    required this.reports,
+    this.published = const [],
+  });
   final List<CommunityPost> pending;
   final List<CommunityReport> reports;
+
+  /// Latest approved posts, newest first, so an admin can remove one that
+  /// nobody reported.
+  final List<CommunityPost> published;
 }
 
 /// A user-facing failure; [message] is safe to show as is.
@@ -115,4 +123,7 @@ abstract interface class CommunityStore {
 
   /// Removes the viewer's own post, with its photo, reactions and reports.
   Future<void> deletePost(String postId);
+
+  /// Admin only: removes any post, with its photo, reactions and reports.
+  Future<void> adminDeletePost(String postId);
 }

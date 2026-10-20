@@ -140,6 +140,22 @@ async function main() {
       assert.equal((await db.query('select public.delete_youwell_post($1) as photo', [pending])).rows[0].photo, `${owner}/pending.png`);
     });
     console.log('Account operations passed: sync names, alias propagation, participant codes, self-reaction denial and author-only deletion.');
+
+    // Phase 7: only an MFA admin deletes someone else's published post.
+    await asUser(reader, 'aal1', async () => {
+      await denied(() => db.query('select public.admin_delete_youwell_post($1)', [approved]));
+    });
+    await asUser(admin, 'aal1', async () => {
+      await denied(() => db.query('select public.admin_delete_youwell_post($1)', [approved]));
+    });
+    await asUser(admin, 'aal2', async () => {
+      const queue = (await db.query('select public.youwell_moderation_queue() as q')).rows[0].q;
+      assert.deepEqual(queue.published.map(p => p.id), [approved]);
+      assert.equal((await db.query('select public.admin_delete_youwell_post($1) as photo', [approved])).rows[0].photo, `${owner}/approved.png`);
+      await assert.rejects(() => db.query('select public.admin_delete_youwell_post($1)', [approved]), error => error.code === 'P0002');
+      assert.deepEqual((await db.query('select public.youwell_moderation_queue() as q')).rows[0].q.published, []);
+    });
+    console.log('Admin deletion passed: reader and admin without MFA denied, MFA admin deletes a published post.');
   } finally { await db.close(); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
