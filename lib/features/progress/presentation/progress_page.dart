@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:youwell/features/reduction/domain/reduction_policy.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/core/theme/app_colors.dart';
 import 'package:youwell/core/utils/date_key.dart';
@@ -146,8 +147,9 @@ class ProgressPage extends StatelessWidget {
                     Expanded(
                       child: _Stat(
                         icon: Icons.swap_horiz_rounded,
-                        value: '${controller.habitSwaps.length}',
-                        label: 'Total catatan momen',
+                        value:
+                            '${controller.habitSwaps.where(isSwapAttempt).length}',
+                        label: 'Total dicoba',
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -155,15 +157,15 @@ class ProgressPage extends StatelessWidget {
                       child: _Stat(
                         icon: Icons.date_range_rounded,
                         value: '${_habitSwapsThisWeek()}',
-                        label: 'Catatan, 7 hari',
+                        label: 'Dicoba, 7 hari',
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _Stat(
                         icon: Icons.swap_horiz_rounded,
-                        value: '${controller.habitSwapsToday}',
-                        label: 'Catatan hari ini',
+                        value: '${controller.swapAttemptsToday.length}',
+                        label: 'Dicoba hari ini',
                       ),
                     ),
                   ],
@@ -185,7 +187,9 @@ class ProgressPage extends StatelessWidget {
     final from = shiftDayKey(controller.today, -6);
     return controller.habitSwaps.where((row) {
       final day = row['day'].toString();
-      return day.compareTo(from) >= 0 && day.compareTo(controller.today) <= 0;
+      return isSwapAttempt(row) &&
+          day.compareTo(from) >= 0 &&
+          day.compareTo(controller.today) <= 0;
     }).length;
   }
 }

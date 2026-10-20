@@ -300,8 +300,8 @@ const ladders = <String, List<LadderRung>>{
     LadderRung(
       title: 'Coba satu aktivitas pengganti',
       description:
-          'Saat ingin merokok atau vape, coba aktivitas lain yang cocok '
-          'dan catat yang sudah kamu lakukan di Habit Swap.',
+          'Saat keinginan muncul, coba kegiatan pengganti lalu laporkan '
+          'di Habit Swap.',
       durationMinutes: 5,
       activityKind: 'habit_swap',
     ),

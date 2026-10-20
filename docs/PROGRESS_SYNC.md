@@ -31,8 +31,10 @@ check-in foto, jumlah/durasi Delay Craving lama, serta ID + tanggal Habit Swap).
 File foto, `photoPath`, rute/koordinat, catatan bebas, isi Habit Swap pribadi,
 komunitas demo, teks Micro-Vent/fokus lama, P-code/persetujuan penelitian,
 token auth, dan offset simulasi hari **tidak dikirim dalam snapshot**.
-Jurnal konsumsi, jenis produk, target mingguan, rencana pengganti, serta detail
-pemicu/aktivitas/hasil Habit Swap juga tetap lokal. Saat menerapkan cloud,
+Jurnal konsumsi, jenis produk, target mingguan, rencana pengganti, persiapan
+Habit Swap (`reductionSetup`), momen yang sedang terbuka (`activeSwapMoment`),
+teks pemicu/kegiatan buatan pengguna, serta detail pemicu/aktivitas/hasil
+Habit Swap juga tetap lokal. Saat menerapkan cloud,
 detail momen dan ID pengiriman lokal dipertahankan hanya untuk ID momen yang
 cocok; perangkat lain hanya menerima tanggal momen (bukan jam atau hasil),
 agar cloud tidak menyimpan log jam craving. Client dan server sama-sama menolak

@@ -77,8 +77,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Berhenti rokok / vape'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Rokok'), 150);
-    await tester.tap(find.text('Rokok'));
+    await tester.scrollUntilVisible(find.text('Saya merokok'), 150);
+    await tester.tap(find.text('Saya merokok'));
     await tester.tap(find.text('Lanjut'));
     await tester.pumpAndSettle();
     expect(find.text('Mau mulai sesantai apa?'), findsOneWidget);
@@ -119,7 +119,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Moderasi komunitas'), findsOneWidget);
+      expect(find.text('Cari alias atau isi post'), findsNothing);
+      expect(find.textContaining('Menunggu ('), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
       expect(controller.profile, isNull);
       expect(tester.takeException(), isNull);

@@ -47,7 +47,8 @@ void main() {
         YouWellApp(controller: controller, surface: AppSurface.admin),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Moderasi komunitas'), findsOneWidget);
+      expect(find.text('Cari alias atau isi post'), findsNothing);
+      expect(find.textContaining('Menunggu ('), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
       expect(controller.profile, isNull);
       expect(find.text('Focus Station'), findsNothing);
@@ -99,7 +100,7 @@ void main() {
     Navigator.of(context).pushNamed('/admin');
     await tester.pumpAndSettle();
     expect(find.text('Moderasi tersedia melalui web admin.'), findsOneWidget);
-    expect(find.text('Moderasi komunitas'), findsNothing);
+    expect(find.textContaining('Menunggu ('), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
   });

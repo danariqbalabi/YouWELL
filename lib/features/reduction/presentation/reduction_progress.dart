@@ -24,23 +24,23 @@ class ReductionProgress extends StatelessWidget {
       padding: const EdgeInsets.all(22),
       children: [
         Text(
-          c.uatProgramComplete
+          c.studyPeriodComplete
               ? 'Rekap 28 hari'
               : 'Minggu $currentWeek · langkah kecil',
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: 8),
         Text(switch (currentWeek) {
-          1 => 'Kenali pola awal dan pemicu. Catat konsumsi apa adanya.',
+          1 => 'Siapkan kegiatan yang cocok dan coba saat keinginan muncul.',
           2 => 'Pilih satu momen untuk diubah. Target jumlah bersifat pilihan.',
           3 => 'Ulangi yang cocok. Target tidak diturunkan otomatis.',
           _ => 'Pertahankan yang cocok dan lihat kembali catatanmu.',
         }),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'Rata-rata memakai hari yang totalnya sudah dikonfirmasi. '
-          'Perbandingan membutuhkan minimal 4 hari tercatat pada kedua minggu. '
-          'Angka sesi vape tidak mengukur dosis nikotin.',
+          'Perbandingan membutuhkan minimal 4 hari tercatat pada kedua minggu.'
+          '${products.contains('vape') ? ' Angka sesi vape tidak mengukur dosis nikotin.' : ''}',
         ),
         const SizedBox(height: 12),
         for (var week = 1; week <= 4; week++)
@@ -77,7 +77,7 @@ class ReductionProgress extends StatelessWidget {
               ),
             ),
           ),
-        if (!c.uatProgramComplete && currentWeek > 1) ...[
+        if (!c.studyPeriodComplete && currentWeek > 1) ...[
           Text(
             'Pilihan target minggu ini',
             style: Theme.of(context).textTheme.titleLarge,
@@ -105,7 +105,8 @@ class ReductionProgress extends StatelessWidget {
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const Text(
-          'Hasil momen dilaporkan sendiri. Catatan lama tanpa hasil tidak dianggap berhasil melewatkan.',
+          'Hasil momen dilaporkan sendiri. Momen yang terlewati tidak '
+          'otomatis berarti hari itu bebas; itu dilihat dari total harian.',
         ),
         if (history.isEmpty)
           const Padding(
@@ -118,15 +119,34 @@ class ReductionProgress extends StatelessWidget {
             title: Text(
               '${row['day']} · ${nicotineProductLabels[row['product']] ?? 'Arsip Habit Swap'}',
             ),
-            subtitle: Text(
-              '${triggerText(row) ?? 'Pemicu belum dicatat'}\n'
-              '${swapActivityLabels[row['activity']] ?? row['swap'] ?? 'Belum mencoba'}\n'
-              '${swapOutcomeLabels[row['outcome']] ?? 'Hasil belum dicatat'}',
-            ),
+            subtitle: Text(_momentText(row)),
           ),
       ],
     );
   }
+}
+
+/// Trigger, activities and outcome of one moment, old rows included. A
+/// missing outcome is shown as such, never guessed.
+String _momentText(Map row) {
+  final product = row['product']?.toString() ?? 'cigarette';
+  final names = activityNames(row);
+  final outcome = row['outcome'];
+  final result = outcome == null
+      ? (awaitingOutcome(row) ? 'Hasil belum diisi' : 'Hasil belum dicatat')
+      : outcome == 'not_tried'
+      ? swapOutcomeLabels['not_tried']!
+      : outcomeLabel(outcome.toString(), product);
+  final used = row['usedProduct'] is String
+      ? ' (${nicotineProductLabels[row['usedProduct']]?.toLowerCase()})'
+      : '';
+  return [
+    triggerText(row) ?? 'Pemicu tidak dicatat',
+    names.isEmpty
+        ? (row['swap']?.toString() ?? 'Belum mencoba')
+        : names.join(', '),
+    '$result$used',
+  ].join('\n');
 }
 
 class _Change extends StatelessWidget {

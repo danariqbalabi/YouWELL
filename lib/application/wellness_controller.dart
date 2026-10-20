@@ -102,7 +102,11 @@ class WellnessController extends ChangeNotifier {
       : null;
   WellnessUatProgram? get wellnessProgram => wellnessUat ? uatProgram : null;
   bool get wellnessProgramComplete => wellnessProgram?.complete == true;
-  bool get uatProgramComplete => uatProgram?.complete == true;
+
+  /// The 28-day study period is over (decision 20 Oct 2026). The app keeps
+  /// working afterwards; only research summaries stop at day 28, since they
+  /// count weeks 1-4 from the start date.
+  bool get studyPeriodComplete => uatProgram?.complete == true;
   int ladderMaximum(String category) => ladderMax(
     category,
     lowImpact: profile?['lowImpact'] == true,
@@ -115,7 +119,7 @@ class WellnessController extends ChangeNotifier {
   bool get quitFraming =>
       const {'under18', '18-22', '18-20'}.contains(profile?['ageGroup']);
   String get reductionLabel =>
-      quitFraming ? 'Berhenti rokok / vape' : 'Kurangi rokok / vape';
+      reductionTitle(nicotineProduct, quit: quitFraming);
   Map<String, dynamic> get days => Map<String, dynamic>.from(_data['days']);
 
   List<JsonMap> _rows(String key) => ((_data[key] ?? const []) as List)
@@ -170,7 +174,7 @@ class WellnessController extends ChangeNotifier {
       .firstOrNull;
 
   bool chooseRecommendedDailyCard() {
-    if (profile == null || uatProgramComplete) return false;
+    if (profile == null) return false;
     prepareToday();
     final card = recommendedDailyCard;
     return card != null && selectDailyCard(card['id'].toString());
@@ -178,7 +182,7 @@ class WellnessController extends ChangeNotifier {
 
   bool get hasCommittedDailyCard => dailyCardDraw?['committedCardId'] != null;
   bool get needsDailyCardDraw =>
-      profile != null && !uatProgramComplete && !hasCommittedDailyCard;
+      profile != null && !hasCommittedDailyCard;
   int get dailyCardSwitchesRemaining =>
       (1 - passedDailyCardIds.length).clamp(0, 1);
   bool get canChooseAnotherDailyCard =>
@@ -201,7 +205,7 @@ class WellnessController extends ChangeNotifier {
 
   /// One optional Kartu Bonus per day, offered after a full day.
   bool get canDrawBonusCard =>
-      !uatProgramComplete && coreComplete && days[today]?['bonusDrawn'] != true;
+      coreComplete && days[today]?['bonusDrawn'] != true;
 
   bool drawBonusCard() {
     if (!canDrawBonusCard) return false;
@@ -325,9 +329,7 @@ class WellnessController extends ChangeNotifier {
           entry.key: (entry.value['step'] as num?)?.toInt() ?? 1,
     };
   }
-  List<String> get ladderOffers => uatProgramComplete
-      ? []
-      : [
+  List<String> get ladderOffers => [
           for (final category in ladderCategories(reduction: reduction))
             if (capacity[category]?['offerStep'] != null) category,
         ];
@@ -426,10 +428,6 @@ class WellnessController extends ChangeNotifier {
     final opened = (_data['openedDays'] ??= <dynamic>[]) as List;
     final firstOpenToday = !opened.contains(today);
     if (firstOpenToday) opened.add(today);
-    if (uatProgramComplete) {
-      if (firstOpenToday) _save();
-      return;
-    }
     final existing = days[today];
     if (existing != null &&
         (existing['cardPacks'] != null ||
@@ -495,14 +493,14 @@ class WellnessController extends ChangeNotifier {
 
   /// Rebuilds today's untouched cards after a ladder or path change.
   void _refreshDraft() {
-    if (days[today] == null || hasCommittedDailyCard || uatProgramComplete) {
+    if (days[today] == null || hasCommittedDailyCard) {
       return;
     }
     _data['days'][today]['cardPacks'] = _cardPacks();
   }
 
   bool _refreshMealDraft() {
-    if (profile == null || hasCommittedDailyCard || uatProgramComplete) {
+    if (profile == null || hasCommittedDailyCard) {
       return false;
     }
     final cards = dailyDrawCards;
@@ -717,7 +715,6 @@ class WellnessController extends ChangeNotifier {
   }
 
   void _reviewLadders() {
-    if (uatProgramComplete) return;
     _reconcileActivityEvidence();
     final ladderState = (_data['capacity'] ??= <String, dynamic>{}) as Map;
     final pace = (profile?['pace'] as num?)?.toInt() ?? 1;
@@ -819,7 +816,6 @@ class WellnessController extends ChangeNotifier {
   int _daysBetween(String from, String to) => daysBetweenKeys(from, to);
 
   void acceptLadderStep(String category) {
-    if (uatProgramComplete) return;
     if (profile != null) _refreshPendingLadderOffers();
     final entry = capacity[category];
     final offer = (entry?['offerStep'] as num?)?.toInt();
@@ -860,7 +856,6 @@ class WellnessController extends ChangeNotifier {
   void drawDailyCards() => prepareToday();
 
   bool selectDailyCard(String id) {
-    if (uatProgramComplete) return false;
     if (profile != null) prepareToday();
     if (hasCommittedDailyCard ||
         passedDailyCardIds.contains(id) ||
@@ -872,7 +867,6 @@ class WellnessController extends ChangeNotifier {
   }
 
   bool chooseAnotherDailyCard() {
-    if (uatProgramComplete) return false;
     if (!canChooseAnotherDailyCard) return false;
     final passed = [...passedDailyCardIds, selectedDailyCardId!];
     final choices = dailyDrawCards
@@ -893,7 +887,6 @@ class WellnessController extends ChangeNotifier {
   }
 
   bool commitDailyCardPack() {
-    if (uatProgramComplete) return false;
     final beforeRefresh = selectedDailyCard;
     final mealRefreshed = _refreshMealDraft();
     if (mealRefreshed &&
@@ -935,7 +928,6 @@ class WellnessController extends ChangeNotifier {
   }
 
   bool completeCard(String id) {
-    if (uatProgramComplete) return false;
     final tasks = quests;
     final before = quests;
     final index = tasks.indexWhere((task) => task['id'] == id);
@@ -949,7 +941,6 @@ class WellnessController extends ChangeNotifier {
   }
 
   void addWater() {
-    if (uatProgramComplete) return;
     prepareToday();
     _markActivity();
     _data['days'][today]['water'] = (water + 250).clamp(0, 4000);
@@ -989,14 +980,7 @@ class WellnessController extends ChangeNotifier {
             startedOn.compareTo(today) < 0
         ? startedOn
         : today;
-    final programEnded = day == today
-        ? uatProgramComplete
-        : profile == null ||
-              WellnessUatProgram(
-                started: profile?['started']?.toString() ?? day,
-                now: DateTime.parse(day),
-              ).complete;
-    if (programEnded) return const WorkoutResult();
+    if (profile == null) return const WorkoutResult();
     if (seconds < 1) return const WorkoutResult();
     // Just after midnight the day may not exist until the next tick.
     prepareToday();
@@ -1056,7 +1040,6 @@ class WellnessController extends ChangeNotifier {
     bool photoCaptured = false,
     String note = '',
   }) {
-    if (uatProgramComplete) return;
     final hasPhotoEvidence = photoPath != null || photoCaptured;
     if (!hasPhotoEvidence && note.trim().isEmpty) return;
     prepareToday();

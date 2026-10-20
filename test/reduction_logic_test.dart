@@ -356,7 +356,7 @@ void main() {
 
   for (final product in ['cigarette', 'vape', 'both']) {
     test(
-      'Complete 28-day $product journey keeps units separate and ends on day 29',
+      'Complete 28-day $product journey keeps units separate; day 29 stays open',
       () async {
         final sim = await reductionSim(product);
         final c = sim.controller;
@@ -396,13 +396,17 @@ void main() {
           }
           sim.nextDay();
         }
-        expect(c.uatProgramComplete, isTrue);
-        expect(c.days, hasLength(28));
+        expect(c.studyPeriodComplete, isTrue);
+        expect(
+          c.days.keys.where((day) => day.compareTo('2026-11-21') < 0),
+          hasLength(28),
+        );
         expect(c.nicotineDays, hasLength(28));
         expect(c.habitSwaps, hasLength(28 * productsFor(product).length));
-        expect(c.needsDailyCardDraw, isFalse);
-        final xp = c.xp;
-        expect(logMoment(c, product: productsFor(product).first), isFalse);
+        // Day 29: the app keeps working (decision 20 Oct 2026)...
+        expect(c.needsDailyCardDraw, isTrue);
+        final week4 = jsonEncode(c.researchSummary(4).toJson());
+        expect(logMoment(c, product: productsFor(product).first), isTrue);
         expect(
           c.saveNicotineDay(
             day: c.today,
@@ -410,8 +414,10 @@ void main() {
             cigarettes: 1,
             vapeSessions: 1,
           ),
-          isFalse,
+          isTrue,
         );
+        // ...while research data still stops at day 28.
+        expect(jsonEncode(c.researchSummary(4).toJson()), week4);
         expect(
           c.saveNicotineDay(
             day: '2026-10-24',
@@ -421,8 +427,6 @@ void main() {
           ),
           isTrue,
         );
-        expect(c.setReductionTarget(productsFor(product).first, 1), isFalse);
-        expect(c.xp, xp);
         for (final kind in productsFor(product)) {
           expect(c.consumptionWeek(4).daysFor(kind), 7);
           expect(

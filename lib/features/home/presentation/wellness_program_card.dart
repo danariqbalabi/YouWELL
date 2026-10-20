@@ -27,13 +27,32 @@ class WellnessProgramCard extends StatelessWidget {
     final quests = summaries.fold(0, (sum, row) => sum + row.questsDone);
     final phase = controller.reduction
         ? switch (program.week) {
-            1 => 'Kenali pola dan pemicu',
+            1 => 'Siapkan kegiatan yang cocok',
             2 => 'Ubah satu momen rutin',
             3 => 'Ulangi yang membantu',
             _ => 'Jaga ritme yang cocok',
           }
         : program.phase;
-    if (compact && !program.complete) {
+    if (compact && program.complete) {
+      // After day 28 the app keeps working; Home only notes the recap.
+      return GameCard(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Row(
+          children: [
+            Icon(Icons.flag_rounded, color: c.success),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Periode 28 hari selesai. Rekap ada di Progres; '
+                'aplikasi tetap bisa kamu pakai.',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (compact) {
       return GameCard(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
         child: Column(
@@ -91,7 +110,8 @@ class WellnessProgramCard extends StatelessWidget {
             const SizedBox(height: 8),
             const Text(
               'Terima kasih sudah mencoba langkah kecil selama perjalanan ini. '
-              'Pilih kebiasaan yang terasa cocok untuk kamu lanjutkan. Riwayat dan progresmu tetap tersimpan.',
+              'Kartu harian, aktivitas, dan Habit Swap tetap bisa kamu pakai. '
+              'Rekap ini hanya menghitung 28 hari pertama.',
             ),
             const SizedBox(height: 12),
             for (final row in summaries)
@@ -109,7 +129,7 @@ class WellnessProgramCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               controller.reduction
-                  ? 'Catat apa adanya, lalu coba satu aktivitas pengganti.'
+                  ? 'Siapkan kegiatan yang cocok dan coba saat keinginan muncul.'
                   : program.message,
             ),
             const SizedBox(height: 12),

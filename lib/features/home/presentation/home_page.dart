@@ -77,7 +77,7 @@ class HomePage extends StatelessWidget {
           const SizedBox(height: 16),
           _LadderBanner(controller: controller),
         ],
-        if (!controller.uatProgramComplete) ...[
+        ...[
           const SizedBox(height: 32),
           _TodayHeader(controller: controller),
           if (controller.quests.isEmpty && controller.needsDailyCardDraw)

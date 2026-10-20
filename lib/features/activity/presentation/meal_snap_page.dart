@@ -40,7 +40,6 @@ class _MealSnapPageState extends State<MealSnapPage> {
   }
 
   Future<void> _pick(ImageSource source) async {
-    if (_programEnded()) return;
     try {
       final image = await _picker.pickImage(
         source: source,
@@ -81,7 +80,6 @@ class _MealSnapPageState extends State<MealSnapPage> {
   }
 
   Future<void> _save() async {
-    if (_programEnded()) return;
     final photo = _photo;
     if (photo == null || _saving) return;
     setState(() => _saving = true);
@@ -94,10 +92,6 @@ class _MealSnapPageState extends State<MealSnapPage> {
         final path = await MealPhotoStore.save(photo);
         if (path == null) {
           throw const FormatException('Penyimpanan foto tidak tersedia.');
-        }
-        if (_programEnded()) {
-          await MealPhotoStore.delete(path);
-          return;
         }
         widget.controller.recordMeal(photoPath: path);
       }
@@ -126,20 +120,8 @@ class _MealSnapPageState extends State<MealSnapPage> {
     }
   }
 
-  bool _programEnded() {
-    if (!widget.controller.uatProgramComplete) return false;
-    if (mounted) {
-      setState(() {
-        _saving = false;
-        _error =
-            'Perjalanan 28 hari selesai. Catatan sebelumnya tetap tersimpan.';
-      });
-    }
-    return true;
-  }
 
   Future<void> _noteOnly() async {
-    if (_programEnded()) return;
     final note = await showDialog<String>(
       context: context,
       builder: (_) => const TextEntryDialog(
@@ -150,7 +132,7 @@ class _MealSnapPageState extends State<MealSnapPage> {
         confirmLabel: 'Simpan',
       ),
     );
-    if (note == null || !mounted || _programEnded()) return;
+    if (note == null || !mounted) return;
     widget.controller.recordMeal(note: note);
     Navigator.pop(context);
   }

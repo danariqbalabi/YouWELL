@@ -132,8 +132,12 @@ void main() {
   });
 
   testWidgets(
-    'Habit Swap can be recorded without starting or waiting for a timer',
+    'Habit Swap needs no timer; trying finishes the mission, outcome can wait',
     (tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final controller = _controller([_quest('delay', activityKind: 'delay')]);
       await tester.pumpWidget(
         MaterialApp(
@@ -142,52 +146,25 @@ void main() {
       );
       expect(find.text('Mulai'), findsNothing);
       expect(find.byIcon(Icons.timer_outlined), findsNothing);
-      await tester.tap(find.text('Setelah makan'));
-      await tester.scrollUntilVisible(
-        find.text('Jalan santai'),
-        150,
-        scrollable: find
-            .descendant(
-              of: find.byType(HabitSwapPanel),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
+      // Someone who needs help now can skip the setup.
+      await tester.tap(find.text('Belum yakin, pilih nanti'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Jalan santai'));
-      await tester.scrollUntilVisible(
-        find.text('Sudah coba, tetap merokok'),
-        150,
-        scrollable: find
-            .descendant(
-              of: find.byType(HabitSwapPanel),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Sudah coba, tetap merokok'));
-      await tester.scrollUntilVisible(
-        find.text('Simpan momen'),
-        150,
-        scrollable: find
-            .descendant(
-              of: find.byType(HabitSwapPanel),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
+      await tester.tap(find.text('Saya akan coba'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Simpan momen'));
-      await tester.pump();
-
-      expect(
-        find.text('Momen tercatat. Terima kasih sudah jujur!'),
-        findsOneWidget,
-      );
-      expect(controller.habitDelays, isEmpty);
-      expect(controller.habitSwapsToday, 1);
+      expect(_status(controller, 'delay'), 'committed');
+      await tester.tap(find.text('Saya sudah mencoba'));
+      await tester.pumpAndSettle();
       expect(_status(controller, 'delay'), 'completed');
+      await tester.tap(find.text('Belum tahu, saya isi nanti'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Simpan hasil'));
+      await tester.pumpAndSettle();
+      expect(controller.swapsAwaitingOutcome, hasLength(1));
+      expect(find.text('Isi hasil'), findsOneWidget);
+      expect(controller.habitDelays, isEmpty);
+      expect(tester.takeException(), isNull);
     },
   );
 }

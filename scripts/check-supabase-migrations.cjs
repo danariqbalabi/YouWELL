@@ -156,6 +156,29 @@ async function main() {
       assert.deepEqual((await db.query('select public.youwell_moderation_queue() as q')).rows[0].q.published, []);
     });
     console.log('Admin deletion passed: reader and admin without MFA denied, MFA admin deletes a published post.');
+
+    // Phase 8: every published post is reachable by search and pages.
+    await db.exec(`
+      insert into public.youwell_posts(author, alias, body, status, created_at)
+      select '${owner}', 'renamed', 'Jalan pagi ' || n, 'approved', now() - (n || ' minutes')::interval
+      from generate_series(1, 5) n;
+      insert into public.youwell_posts(author, alias, body, status)
+      values ('${owner}', 'renamed', 'Masih menunggu', 'pending');
+    `);
+    await asUser(admin, 'aal1', async () => {
+      await denied(() => db.query('select public.youwell_admin_published_posts()'));
+    });
+    await asUser(admin, 'aal2', async () => {
+      const page = async (q, before, limit) =>
+        (await db.query('select public.youwell_admin_published_posts($1, $2, $3) as r', [q, before, limit])).rows[0].r;
+      const first = await page(null, null, 2);
+      assert.deepEqual(first.map(p => p.body), ['Jalan pagi 1', 'Jalan pagi 2']);
+      const next = await page(null, first[1].created_at, 2);
+      assert.deepEqual(next.map(p => p.body), ['Jalan pagi 3', 'Jalan pagi 4']);
+      assert.deepEqual((await page('pagi 5', null, 30)).map(p => p.body), ['Jalan pagi 5']);
+      assert.equal((await page('menunggu', null, 30)).length, 0);
+    });
+    console.log('Published search passed: MFA only, newest first, cursor pages, text search, approved only.');
   } finally { await db.close(); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

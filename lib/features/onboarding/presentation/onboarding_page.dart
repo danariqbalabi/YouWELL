@@ -227,15 +227,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
         icon: Icons.smoke_free_rounded,
         title: _quitFraming ? 'Berhenti rokok / vape' : 'Kurangi rokok / vape',
         detail: _quitFraming
-            ? 'Kenali kebiasaan dan coba aktivitas pengganti saat ingin.'
+            ? 'Siapkan kegiatan pengganti dan coba saat keinginan muncul.'
             : 'Coba aktivitas pengganti saat ingin, tanpa dihakimi.',
         selected: _path == 'reduction',
         onTap: () => _pick(() => _path = 'reduction'),
       ),
       if (_path == 'reduction') ...[
         const SizedBox(height: 12),
-        const Text('Apa yang kamu gunakan? Rokok dan vape dicatat terpisah.'),
-        for (final entry in nicotineProductLabels.entries)
+        const Text('Apa yang kamu gunakan? Bisa diubah nanti di Profil.'),
+        for (final entry in nicotineChoiceLabels.entries)
           _Option(
             icon: Icons.smoke_free_rounded,
             title: entry.value,

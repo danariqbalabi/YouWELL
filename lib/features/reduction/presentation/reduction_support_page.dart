@@ -7,15 +7,20 @@ import 'package:youwell/features/reduction/domain/reduction_policy.dart';
 import 'package:youwell/features/reduction/presentation/reduction_diary.dart';
 import 'package:youwell/features/reduction/presentation/reduction_progress.dart';
 
+/// [product] preselects "Saya ingin merokok/vape" for users of both.
 void openReductionSupport(
   BuildContext context,
   WellnessController controller, {
   int initialTab = 0,
+  String? product,
 }) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) =>
-          ReductionSupportPage(controller: controller, initialTab: initialTab),
+      builder: (_) => ReductionSupportPage(
+        controller: controller,
+        initialTab: initialTab,
+        product: product,
+      ),
     ),
   );
 }
@@ -26,18 +31,20 @@ class ReductionSupportPage extends StatelessWidget {
     super.key,
     required this.controller,
     this.initialTab = 0,
+    this.product,
   });
   final WellnessController controller;
   final int initialTab;
+  final String? product;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: controller,
     builder: (context, _) => Scaffold(
       appBar: AppBar(
-        title: const Text('Rokok / vape'),
+        title: Text(controller.reductionLabel),
         actions: [
-          if (controller.reduction && !controller.uatProgramComplete)
+          if (controller.reduction)
             IconButton(
               tooltip: 'Ubah jenis penggunaan',
               icon: const Icon(Icons.tune_rounded),
@@ -46,7 +53,7 @@ class ReductionSupportPage extends StatelessWidget {
                 builder: (dialogContext) => SimpleDialog(
                   title: const Text('Jenis penggunaan'),
                   children: [
-                    for (final entry in nicotineProductLabels.entries)
+                    for (final entry in nicotineChoiceLabels.entries)
                       SimpleDialogOption(
                         onPressed: () {
                           controller.setNicotineProduct(entry.key);
@@ -68,12 +75,9 @@ class ReductionSupportPage extends StatelessWidget {
                     ? HabitSwapPanel(controller: controller)
                     : const Padding(
                         padding: EdgeInsets.all(22),
-                        child: Text(
-                          'Misi Habit Swap sudah tercatat.',
-                        ),
+                        child: Text('Misi Habit Swap sudah tercatat.'),
                       ))
-              : controller.nicotineProduct == null &&
-                    !controller.uatProgramComplete
+              : controller.nicotineProduct == null
               ? ListView(
                   padding: const EdgeInsets.all(22),
                   children: [
@@ -82,11 +86,9 @@ class ReductionSupportPage extends StatelessWidget {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Rokok dihitung per batang, vape per sesi.',
-                    ),
+                    const Text('Rokok dihitung per batang, vape per sesi.'),
                     const SizedBox(height: 20),
-                    for (final entry in nicotineProductLabels.entries)
+                    for (final entry in nicotineChoiceLabels.entries)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: OutlinedButton(
@@ -113,7 +115,10 @@ class ReductionSupportPage extends StatelessWidget {
                       Expanded(
                         child: TabBarView(
                           children: [
-                            HabitSwapPanel(controller: controller),
+                            HabitSwapPanel(
+                              controller: controller,
+                              product: product,
+                            ),
                             ReductionDiary(controller: controller),
                             ReductionProgress(controller: controller),
                           ],
@@ -161,58 +166,61 @@ class ReductionEntryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${controller.swapAttemptsToday.length}',
-                style: const TextStyle(
-                  fontSize: 34,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
-                ),
+          Text(
+            '${controller.swapAttemptsToday.length} kali mencoba kegiatan '
+            'pengganti hari ini',
+            style: TextStyle(color: c.muted, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          if (controller.activeSwapMoment != null)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => openReductionSupport(context, controller),
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('Lanjutkan momen'),
               ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Text(
-                    'aktivitas dicoba hari ini',
-                    style: TextStyle(
-                      color: c.muted,
-                      fontWeight: FontWeight.w700,
+            )
+          else if (controller.nicotineProduct == null)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => openReductionSupport(context, controller),
+                icon: const Icon(Icons.swap_horiz_rounded),
+                label: const Text('Buka Habit Swap'),
+              ),
+            )
+          else
+            // One button per product: "keduanya" picks which craving now.
+            for (final product in productsFor(controller.nicotineProduct))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => openReductionSupport(
+                      context,
+                      controller,
+                      product: product,
                     ),
+                    icon: const Icon(Icons.swap_horiz_rounded),
+                    label: Text(cravingLabel(product)),
                   ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            controller.uatProgramComplete
-                ? 'Perjalanan 28 hari selesai. Lihat kembali catatan dan rekapmu.'
-                : 'Lagi ingin merokok/vape? Coba satu pengganti, lalu catat.',
-            style: TextStyle(color: c.muted),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
+          if (controller.swapsAwaitingOutcome.isNotEmpty)
+            TextButton(
               onPressed: () => openReductionSupport(context, controller),
-              icon: const Icon(Icons.swap_horiz_rounded),
-              label: Text(
-                controller.uatProgramComplete
-                    ? 'Lihat catatan & rekap'
-                    : 'Buka Habit Swap',
+              child: Text(
+                '${controller.swapsAwaitingOutcome.length} hasil momen '
+                'belum diisi',
               ),
             ),
+          TextButton(
+            onPressed: () =>
+                openReductionSupport(context, controller, initialTab: 1),
+            child: const Text('Catat konsumsi hari ini'),
           ),
-          if (!controller.uatProgramComplete)
-            TextButton(
-              onPressed: () =>
-                  openReductionSupport(context, controller, initialTab: 1),
-              child: const Text('Catat konsumsi hari ini'),
-            ),
         ],
       ),
     );
