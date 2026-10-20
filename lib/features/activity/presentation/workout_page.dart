@@ -277,20 +277,6 @@ class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
 
   void _finish() {
     _pause();
-    // A walk begun on day 28 still counts after midnight on day 29.
-    if (widget.controller.uatProgramComplete &&
-        _sessionDay == widget.controller.today) {
-      widget.controller.saveWorkoutDraft(null);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Perjalanan 28 hari selesai. Sesi ini tidak menambah challenge atau XP.',
-          ),
-        ),
-      );
-      Navigator.of(context).pop();
-      return;
-    }
     if (_watch.elapsed.inSeconds < 1) return;
     final result = widget.controller.recordWorkout(
       kind: _kind,

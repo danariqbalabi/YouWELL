@@ -21,7 +21,34 @@ Timer jeda, kenaikan durasi menunggu, dan lencana menit ditunda dihapus.
   dilaporkan membantu dapat diurutkan lebih dahulu. Ini rule-based, bukan ML
   atau bukti efektivitas klinis. Riwayat saran dibatasi tujuh hari terakhir.
 
-## Pemicu → aktivitas → hasil
+## Alur Habit Swap (keputusan 20 Okt 2026)
+
+- Pilihan: "Saya merokok", "Saya memakai vape", "Saya memakai keduanya"
+  (bisa diubah di Profil). Judul, tombol, hasil, dan catatan harian memakai
+  kata produk itu saja; pengguna rokok tidak melihat instruksi vape dan
+  sebaliknya. Sesi vape tidak pernah disamakan dengan batang rokok.
+- Persiapan sekali per produk: pemicu yang biasa, kegiatan yang mau dicoba
+  (boleh beberapa, boleh teks sendiri), ringkasan, "Simpan pilihan saya".
+  Ini daftar pilihan, bukan catatan kegiatan. "Belum yakin, pilih nanti"
+  langsung membuka bantuan. "Ubah pemicu & kegiatan" tidak mengubah momen lama.
+- Saat keinginan muncul: (keduanya: pilih produk) → "Coba lakukan satu
+  kegiatan dulu" dengan pilihan pribadi di atas, "Lihat kegiatan lain",
+  "Tulis kegiatan sendiri" → "Saya akan coba" membuka momen. Momen terbuka
+  tersimpan di HP saja, dilanjutkan saat kembali, bisa dibatalkan, dan tidak
+  bisa terbuka dua kali. Tidak ada hitung mundur.
+- "Saya sudah mencoba" menyelesaikan misi Habit Swap (XP sekali per misi),
+  lalu "Setelah mencoba, apa yang terjadi?": tidak jadi pada momen ini /
+  akhirnya tetap memakai / belum tahu, isi nanti. Pengguna keduanya dapat
+  mencatat produk yang ternyata dipakai. Memilih kegiatan atau menekan
+  "Saya akan coba" belum menyelesaikan misi.
+- "Tidak jadi pada momen ini" bukan hari bebas. Hari bebas hanya bila total
+  harian 0 dikonfirmasi untuk setiap produk yang dipilih.
+- Hanya momen yang sudah dicoba menjadi catatan Habit Swap, jadi hitungan
+  riset `habit_swap` tetap jumlah percobaan. Momen dibatalkan tidak dicatat.
+- Data lama tetap terbaca: catatan lengkap tetap selesai, catatan tanpa hasil
+  tidak ditebak hasilnya, dan rencana lama dibaca sebagai persiapan.
+
+## Pemicu → aktivitas → hasil (catatan sebelum 20 Okt)
 
 - Jenis penggunaan: rokok / vape / keduanya. Setiap momen hanya satu jenis.
 - Pemicu sama-sama tersedia, urutan berbeda: rokok mulai dari setelah makan

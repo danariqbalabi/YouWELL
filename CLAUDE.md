@@ -6,7 +6,24 @@ Dokumen ini merangkum keputusan desain YouWell yang sudah dikunci di proposal pe
 
 ---
 
-## Keputusan terbaru: 15 Oktober 2026
+## Keputusan terbaru: 20 Oktober 2026
+
+UAT berjalan 20 Oktober – 20 November 2026 (termasuk buffer). Setelah hari
+ke-28 aplikasi **tetap bisa dipakai penuh** (kartu harian, aktivitas, Habit
+Swap, catatan harian); yang menjadi data studi hanya 28 hari pertama, karena
+ringkasan riset menghitung minggu 1–4 dari tanggal mulai. Ini menggantikan
+ketentuan "kedua path dibatasi 28 hari" di keputusan 15 Oktober.
+Jalur rokok/vape kini mengikuti pilihan "Saya merokok / Saya memakai vape /
+Saya memakai keduanya" (bisa diubah di Profil): judul, tombol "Saya ingin
+merokok/vape", hasil, dan catatan harian memakai kata produk itu saja.
+Habit Swap memakai persiapan sekali per produk (pemicu & kegiatan favorit,
+boleh teks sendiri, boleh "Belum yakin, pilih nanti") dan alur momen:
+"Saya akan coba" → "Saya sudah mencoba" (misi + XP sekali) → hasil sekarang
+atau nanti; momen terbuka bisa dilanjutkan atau dibatalkan. Hasil satu momen
+tidak pernah berarti hari bebas; itu hanya dari total harian 0 yang
+dikonfirmasi. Detail lengkap di `docs/REDUCTION_UAT.md`.
+
+## Keputusan sebelumnya: 15 Oktober 2026
 
 Pengembang meminta penghapusan Delay Craving/timer jeda. Keputusan ini
 menggantikan ketentuan timer di bagian proposal lama di bawah dan di dokumen

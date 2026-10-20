@@ -6,6 +6,43 @@ const nicotineProductLabels = {
   'vape': 'Vape',
   'both': 'Rokok dan vape',
 };
+/// How the choice reads where the user picks it (onboarding, settings).
+const nicotineChoiceLabels = {
+  'cigarette': 'Saya merokok',
+  'vape': 'Saya memakai vape',
+  'both': 'Saya memakai keduanya',
+};
+
+/// The verb after "ingin", "tidak jadi" or "tetap" for one product.
+String useVerb(String product) => product == 'vape' ? 'vape' : 'merokok';
+
+/// The path's title for the chosen product. Under 21 speaks about quitting
+/// (PP 28/2024 Ps. 434); with both products the title stays neutral.
+String reductionTitle(String? choice, {required bool quit}) => switch (choice) {
+  'cigarette' => quit ? 'Berhenti merokok' : 'Kurangi rokok',
+  'vape' => quit ? 'Berhenti vaping' : 'Kurangi vape',
+  'both' => 'Kelola rokok dan vape',
+  _ => quit ? 'Berhenti rokok / vape' : 'Kurangi rokok / vape',
+};
+
+/// "merokok", "vape" or "merokok atau vape" for the chosen product(s).
+String choiceVerb(String? choice) => switch (choice) {
+  'vape' => 'vape',
+  'both' => 'merokok atau vape',
+  _ => 'merokok',
+};
+
+/// The button that opens Habit Swap when a craving starts.
+String cravingLabel(String product) => 'Saya ingin ${useVerb(product)}';
+
+/// A moment's outcome in the words of its own product.
+String outcomeLabel(String outcome, String product) => switch (outcome) {
+  'skipped' => 'Tidak jadi ${useVerb(product)} pada momen ini',
+  'used' => 'Akhirnya tetap ${useVerb(product)}',
+  'later' => 'Belum tahu, saya isi nanti',
+  _ => swapOutcomeLabels[outcome] ?? 'Hasil belum dicatat',
+};
+
 const reductionTriggerLabels = {
   'after_meal': 'Setelah makan',
   'coffee': 'Minum kopi',
@@ -21,6 +58,7 @@ const swapActivityLabels = {
   'seated': 'Gerak sambil duduk',
   'hands': 'Sibukkan tangan',
   'water': 'Minum segelas air',
+  'music': 'Dengarkan musik',
   'breathing': 'Tarik napas pelan',
   'contact': 'Hubungi teman',
 };
@@ -59,8 +97,33 @@ List<String> triggersFor(String product) => product == 'vape'
         'other',
       ];
 
+/// A moment whose activity was reported as tried. New moments carry
+/// `tried` from "Saya sudah mencoba", before any outcome; older rows only
+/// have an outcome.
 bool isSwapAttempt(Map row) =>
-    const ['skipped', 'used'].contains(row['outcome']);
+    row['tried'] == true || const ['skipped', 'used'].contains(row['outcome']);
+
+/// A tried moment whose outcome the user chose to fill in later.
+bool awaitingOutcome(Map row) =>
+    row['tried'] == true && row['outcome'] == null && row['status'] != 'done';
+
+/// Free-text triggers/activities: trimmed, short, no duplicates.
+const maxCustomSwapText = 40;
+List<String> cleanCustom(Iterable<String> values) => {
+  for (final value in values)
+    if (value.trim().isNotEmpty && value.trim().length <= maxCustomSwapText)
+      value.trim(),
+}.toList();
+
+/// Every activity of a moment or setup in reading form, custom ones too.
+List<String> activityNames(Map row) => [
+  for (final key in {
+    ...?(row['activities'] as List?)?.whereType<String>(),
+    if (row['activity'] is String) row['activity'] as String,
+  })
+    ?swapActivityLabels[key],
+  ...?(row['customActivities'] as List?)?.whereType<String>(),
+];
 
 /// Product-specific self-report: a vape session is never a cigarette or a
 /// nicotine dose. Missing/unconfirmed days are absent, never implicit zeroes.
@@ -127,6 +190,7 @@ List<String> momentTriggers(Map row) => [
 String? triggerText(Map row) {
   final labels = [
     for (final key in momentTriggers(row)) ?reductionTriggerLabels[key],
+    ...?(row['customTriggers'] as List?)?.whereType<String>(),
   ];
   return labels.isEmpty ? null : labels.join(', ');
 }
@@ -143,8 +207,8 @@ List<String> suggestedSwaps({
 }) {
   final picked = {...triggers, if (trigger.isNotEmpty) trigger};
   final order = lowImpact
-      ? ['seated', 'hands', 'water', 'breathing', 'contact', 'walk']
-      : ['walk', 'seated', 'hands', 'water', 'breathing', 'contact'];
+      ? ['seated', 'hands', 'water', 'breathing', 'music', 'contact', 'walk']
+      : ['walk', 'seated', 'hands', 'water', 'breathing', 'music', 'contact'];
   double score(String activity) {
     final matches = history.where(
       (row) =>

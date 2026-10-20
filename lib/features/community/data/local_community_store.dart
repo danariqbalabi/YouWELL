@@ -34,6 +34,7 @@ class LocalCommunityStore implements CommunityStore {
       myReaction: reaction,
       reported: controller.hasReportedCommunityPost(id),
       moderationNote: row['moderationNote']?.toString(),
+      createdAt: DateTime.tryParse(row['time']?.toString() ?? ''),
     );
   }
 
@@ -106,6 +107,26 @@ class LocalCommunityStore implements CommunityStore {
   @override
   Future<void> deletePost(String postId) async =>
       controller.deleteCommunityPost(postId);
+
+  @override
+  Future<List<CommunityPost>> publishedPosts({
+    String query = '',
+    DateTime? before,
+    int limit = 30,
+  }) async {
+    final q = query.trim().toLowerCase();
+    return (await moderationQueue()).published
+        .where(
+          (post) =>
+              (q.isEmpty ||
+                  post.alias.toLowerCase().contains(q) ||
+                  post.body.toLowerCase().contains(q)) &&
+              (before == null ||
+                  (post.createdAt != null && post.createdAt!.isBefore(before))),
+        )
+        .take(limit)
+        .toList();
+  }
 
   @override
   Future<void> adminDeletePost(String postId) async =>

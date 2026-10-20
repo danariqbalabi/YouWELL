@@ -459,16 +459,6 @@ const _catalog = [
     activityKind: 'habit_swap',
   ),
   _TaskDefinition(
-    id: 'trigger',
-    title: 'Kenali satu pemicu',
-    description: 'Perhatikan situasi saat keinginan muncul.',
-    category: 'Reduction',
-    difficulty: 2,
-    durationMinutes: 3,
-    xp: 30,
-    reductionOnly: true,
-  ),
-  _TaskDefinition(
     id: 'swap-plan',
     title: 'Rencana Habit Swap',
     description: 'Siapkan dua pengganti untuk momen keinginan.',

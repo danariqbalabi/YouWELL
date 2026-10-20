@@ -9,6 +9,7 @@ import 'package:youwell/features/activity/data/meal_photo_store.dart';
 import 'package:youwell/shared/widgets/game_widgets.dart';
 import 'package:youwell/features/companion/presentation/mobile_companion.dart';
 import 'package:youwell/features/companion/domain/companion_rewards.dart';
+import 'package:youwell/features/reduction/domain/reduction_policy.dart';
 import 'package:youwell/features/reduction/presentation/reduction_support_page.dart';
 import 'package:youwell/features/auth/presentation/account_scope.dart';
 import 'package:youwell/features/sync/presentation/progress_sync_panel.dart';
@@ -35,6 +36,24 @@ class ProfilePage extends StatelessWidget {
           return '3–20 karakter, diawali huruf (huruf/angka/_).';
         }
       },
+    ),
+  );
+
+  /// Rokok, vape or both; history and daily totals stay per product.
+  Future<void> _chooseProduct(BuildContext context) => showDialog<void>(
+    context: context,
+    builder: (dialogContext) => SimpleDialog(
+      title: const Text('Yang kamu gunakan'),
+      children: [
+        for (final entry in nicotineChoiceLabels.entries)
+          SimpleDialogOption(
+            onPressed: () {
+              controller.setNicotineProduct(entry.key);
+              Navigator.pop(dialogContext);
+            },
+            child: Text(entry.value),
+          ),
+      ],
     ),
   );
 
@@ -255,12 +274,19 @@ class ProfilePage extends StatelessWidget {
                   value: controller.reduction,
                   onChanged: (value) => _switchPath(context, value),
                 ),
-                if (controller.reduction)
+                if (controller.reduction) ...[
+                  _Row(
+                    icon: Icons.local_fire_department_outlined,
+                    label:
+                        'Yang kamu gunakan: ${nicotineChoiceLabels[controller.nicotineProduct] ?? 'belum dipilih'}',
+                    onTap: () => _chooseProduct(context),
+                  ),
                   _Row(
                     icon: Icons.swap_horiz_rounded,
                     label: 'Buka Habit Swap',
                     onTap: () => openReductionSupport(context, controller),
                   ),
+                ],
                 SwitchListTile(
                   secondary: const Icon(Icons.directions_walk_rounded),
                   title: const Text(

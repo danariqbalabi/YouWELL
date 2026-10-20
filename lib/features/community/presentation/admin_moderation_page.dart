@@ -8,8 +8,11 @@ import 'package:youwell/features/community/presentation/community_page.dart';
 const _reasonLabels = {'unsafe': 'Tidak aman', 'spam': 'Spam'};
 
 class AdminModerationPage extends StatefulWidget {
-  const AdminModerationPage({super.key, required this.controller});
+  const AdminModerationPage({super.key, required this.controller, this.store});
   final WellnessController controller;
+
+  /// Overrides the account's store (tests).
+  final CommunityStore? store;
 
   @override
   State<AdminModerationPage> createState() => _AdminModerationPageState();
@@ -21,10 +24,50 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
   String? _error;
   bool _busy = false;
 
+  /// Which list is shown: pending, published or reports.
+  var _view = 'pending';
+
+  // "Sudah tayang": searched, paged from the server, newest first.
+  static const _pageSize = 30;
+  final _search = TextEditingController();
+  List<CommunityPost>? _published;
+  bool _hasMore = false, _loadingMore = false;
+  String? _publishedError;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPublished({bool more = false}) async {
+    if (_loadingMore) return;
+    setState(() {
+      _loadingMore = true;
+      if (!more) _publishedError = null;
+    });
+    try {
+      final page = await _store.publishedPosts(
+        query: _search.text,
+        before: more ? _published?.lastOrNull?.createdAt : null,
+        limit: _pageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _published = [if (more) ...?_published, ...page];
+        _hasMore = page.length == _pageSize;
+      });
+    } on CommunityException catch (error) {
+      if (mounted) setState(() => _publishedError = error.message);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _store = communityStoreOf(context, widget.controller);
+    _store = widget.store ?? communityStoreOf(context, widget.controller);
     if (_queue == null) _load();
   }
 
@@ -42,12 +85,15 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
     }
   }
 
-  Future<void> _act(Future<void> Function() action) async {
-    if (_busy) return;
+  /// Runs [action], shows its error if any, and reloads. True on success.
+  Future<bool> _act(Future<void> Function() action) async {
+    if (_busy) return false;
     setState(() => _busy = true);
+    var ok = true;
     try {
       await action();
     } on CommunityException catch (error) {
+      ok = false;
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -56,6 +102,7 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
     }
     await _load();
     if (mounted) setState(() => _busy = false);
+    return ok;
   }
 
   /// Deleting cannot be undone, so it always asks first.
@@ -85,8 +132,11 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    await _act(() => _store.adminDeletePost(post.id));
-    if (mounted) {
+    // Only confirm success; a failure already showed its own message.
+    if (await _act(() => _store.adminDeletePost(post.id)) && mounted) {
+      setState(
+        () => _published = _published?.where((p) => p.id != post.id).toList(),
+      );
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(const SnackBar(content: Text('Post dihapus.')));
@@ -103,13 +153,13 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
         padding: const EdgeInsets.all(30),
         children: [
           const Text(
-            'Moderasi komunitas',
+            'Community',
             style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
           Text(
             _store.shared
-                ? 'Post peserta tampil setelah kamu setujui. Hanya alias dan isi post yang terlihat.'
+                ? 'Setujui post baru, tinjau laporan, dan hapus post yang sudah tayang. Hanya alias dan isi post yang terlihat.'
                 : 'Pratinjau lokal. Halaman ini tidak menerima post dari perangkat peserta.',
             style: TextStyle(color: context.colors.muted),
           ),
@@ -139,135 +189,130 @@ class _AdminModerationPageState extends State<AdminModerationPage> {
           ] else if (queue == null)
             const Center(child: CircularProgressIndicator())
           else ...[
-            _Summary(
-              pending: queue.pending.length,
-              reports: queue.reports.length,
-              published: queue.published.length,
+            SegmentedButton<String>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: 'pending',
+                  label: Text('Menunggu (${queue.pending.length})'),
+                ),
+                const ButtonSegment(
+                  value: 'published',
+                  label: Text('Sudah tayang'),
+                ),
+                ButtonSegment(
+                  value: 'reports',
+                  label: Text('Laporan (${queue.reports.length})'),
+                ),
+              ],
+              selected: {_view},
+              onSelectionChanged: (value) {
+                setState(() => _view = value.single);
+                // Reload so newly approved posts show up.
+                if (_view == 'published') _loadPublished();
+              },
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Menunggu persetujuan',
-              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 12),
-            if (queue.pending.isEmpty)
-              const _Empty(message: 'Tidak ada post yang menunggu review.'),
-            for (final post in queue.pending)
-              _ModerationCard(
-                post: post,
-                busy: _busy,
-                approveLabel: 'Setujui',
-                rejectLabel: 'Tolak',
-                onApprove: () =>
-                    _act(() => _store.moderate(post.id, approve: true)),
-                onReject: () =>
-                    _act(() => _store.moderate(post.id, approve: false)),
-                onDelete: () => _delete(post),
-              ),
-            const SizedBox(height: 24),
-            const Text(
-              'Laporan',
-              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 12),
-            if (queue.reports.isEmpty)
-              const _Empty(message: 'Tidak ada laporan aktif.'),
-            for (final report in queue.reports)
-              _ModerationCard(
-                post: report.post,
-                busy: _busy,
-                label: 'Dilaporkan: ${_reasonLabels[report.reason] ?? report.reason}',
-                approveLabel: 'Biarkan tampil',
-                rejectLabel: 'Sembunyikan',
-                onApprove: () => _act(() => _store.resolveReport(report.id)),
-                onReject: () async {
-                  await _act(
-                    () => _store.moderate(report.post.id, approve: false),
-                  );
-                  // The server settles reports on hide; the preview does not.
-                  if (!_store.shared) {
-                    await _act(() => _store.resolveReport(report.id));
-                  }
-                },
-                onDelete: () => _delete(report.post),
-              ),
-            const SizedBox(height: 24),
-            const Text(
-              'Sudah tayang',
-              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '100 post terbaru yang sudah disetujui.',
-              style: TextStyle(color: context.colors.muted),
-            ),
-            const SizedBox(height: 12),
-            if (queue.published.isEmpty)
-              const _Empty(message: 'Belum ada post yang tayang.'),
-            for (final post in queue.published)
-              _ModerationCard(
-                post: post,
-                busy: _busy,
-                onDelete: () => _delete(post),
-              ),
+            const SizedBox(height: 20),
+            ...switch (_view) {
+              'published' => _publishedView(context),
+              'reports' => _reportsView(queue),
+              _ => _pendingView(queue),
+            },
           ],
         ],
       ),
     );
   }
-}
 
-class _Summary extends StatelessWidget {
-  const _Summary({
-    required this.pending,
-    required this.reports,
-    required this.published,
-  });
-  final int pending, reports, published;
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Expanded(
-        child: _Number(value: '$pending', label: 'Menunggu'),
+  List<Widget> _pendingView(ModerationQueue queue) => [
+    if (queue.pending.isEmpty)
+      const _Empty(message: 'Tidak ada post yang menunggu review.'),
+    for (final post in queue.pending)
+      _ModerationCard(
+        post: post,
+        busy: _busy,
+        approveLabel: 'Setujui',
+        rejectLabel: 'Tolak',
+        onApprove: () => _act(() => _store.moderate(post.id, approve: true)),
+        onReject: () => _act(() => _store.moderate(post.id, approve: false)),
+        onDelete: () => _delete(post),
       ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: _Number(value: '$reports', label: 'Laporan'),
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: _Number(value: '$published', label: 'Tayang'),
-      ),
-    ],
-  );
-}
+  ];
 
-class _Number extends StatelessWidget {
-  const _Number({required this.value, required this.label});
-  final String value, label;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: context.colors.surface,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: context.colors.border),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            color: context.colors.accent,
-            fontSize: 32,
-            fontWeight: FontWeight.w900,
+  List<Widget> _reportsView(ModerationQueue queue) => [
+    if (queue.reports.isEmpty)
+      const _Empty(message: 'Tidak ada laporan aktif.'),
+    for (final report in queue.reports)
+      _ModerationCard(
+        post: report.post,
+        busy: _busy,
+        label: 'Dilaporkan: ${_reasonLabels[report.reason] ?? report.reason}',
+        approveLabel: 'Biarkan tampil',
+        rejectLabel: 'Sembunyikan',
+        onApprove: () => _act(() => _store.resolveReport(report.id)),
+        onReject: () async {
+          await _act(() => _store.moderate(report.post.id, approve: false));
+          // The server settles reports on hide; the preview does not.
+          if (!_store.shared) {
+            await _act(() => _store.resolveReport(report.id));
+          }
+        },
+        onDelete: () => _delete(report.post),
+      ),
+  ];
+
+  List<Widget> _publishedView(BuildContext context) {
+    final posts = _published;
+    return [
+      TextField(
+        controller: _search,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.search_rounded),
+          hintText: 'Cari alias atau isi post',
+          suffixIcon: IconButton(
+            tooltip: 'Cari',
+            icon: const Icon(Icons.arrow_forward_rounded),
+            onPressed: _loadPublished,
           ),
         ),
-        Text(label, style: TextStyle(color: context.colors.muted)),
+        onSubmitted: (_) => _loadPublished(),
+      ),
+      const SizedBox(height: 16),
+      if (_publishedError != null) ...[
+        _Empty(message: _publishedError!),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: _loadPublished,
+            child: const Text('Coba lagi'),
+          ),
+        ),
+      ] else if (posts == null)
+        const Center(child: CircularProgressIndicator())
+      else ...[
+        if (posts.isEmpty)
+          _Empty(
+            message: _search.text.trim().isEmpty
+                ? 'Belum ada post yang tayang.'
+                : 'Tidak ada post tayang yang cocok.',
+          ),
+        for (final post in posts)
+          _ModerationCard(
+            post: post,
+            busy: _busy,
+            onDelete: () => _delete(post),
+          ),
+        if (_hasMore)
+          Center(
+            child: OutlinedButton(
+              onPressed: _loadingMore ? null : () => _loadPublished(more: true),
+              child: const Text('Muat lebih banyak'),
+            ),
+          ),
       ],
-    ),
-  );
+    ];
+  }
 }
 
 class _ModerationCard extends StatelessWidget {

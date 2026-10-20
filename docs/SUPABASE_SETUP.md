@@ -76,6 +76,10 @@ Tahap 7 (`20261020090000_admin_post_delete.sql`) membolehkan admin ber-MFA
 menghapus post apa pun, termasuk yang sudah tayang, beserta foto, reaksi, dan
 laporannya. Antrean moderasi kini juga memuat 100 post tayang terbaru di
 bagian **Sudah tayang**. Jalankan sebelum memakai build admin terbaru.
+Tahap 8 (`20261020120000_admin_published_search.sql`) membuat tab
+**Community** di admin dapat mencari post tayang menurut alias/isi dan memuat
+halaman berikutnya, jadi post lama di luar 100 terbaru tetap bisa dihapus.
+Jalankan setelah tahap 7.
 Schema `private` tidak boleh ditambahkan ke daftar exposed schemas.
 
 Tabel `public.youwell_profiles` memakai RLS pemilik (`auth.uid() = user_id`)

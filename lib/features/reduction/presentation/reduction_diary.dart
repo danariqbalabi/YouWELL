@@ -17,17 +17,12 @@ class _ReductionDiaryState extends State<ReductionDiary> {
   bool _confirmed = false;
   WellnessController get c => widget.controller;
 
+  /// Every day from the start until today. The diary stays open after day
+  /// 28; research summaries only read weeks 1-4.
   List<String> get dates {
-    final first = c.uatProgram!.firstDay;
-    return [for (var i = 0; i < 28; i++) shiftDayKey(dayKey(first), i)]
-        .where(
-          (day) =>
-              day.compareTo(c.today) <= 0 &&
-              (!c.uatProgramComplete || c.nicotineDay(day) != null),
-        )
-        .toList()
-        .reversed
-        .toList();
+    final first = dayKey(c.uatProgram!.firstDay);
+    final count = daysBetweenKeys(first, c.today) + 1;
+    return [for (var i = count - 1; i >= 0; i--) shiftDayKey(first, i)];
   }
 
   @override
@@ -78,7 +73,7 @@ class _ReductionDiaryState extends State<ReductionDiary> {
     if (!saved) {
       setState(
         () => _error =
-            'Gunakan angka bulat 0–500 pada tanggal dalam periode UAT.',
+            'Gunakan angka bulat 0–500 untuk tanggal yang sudah lewat.',
       );
       return;
     }
@@ -95,14 +90,6 @@ class _ReductionDiaryState extends State<ReductionDiary> {
 
   @override
   Widget build(BuildContext context) {
-    if (dates.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(22),
-        child: Text(
-          'Belum ada total harian yang tersimpan. Periode UAT sudah selesai.',
-        ),
-      );
-    }
     return ListView(
       padding: const EdgeInsets.all(22),
       children: [
@@ -115,13 +102,6 @@ class _ReductionDiaryState extends State<ReductionDiary> {
           'Isi total sepanjang hari, misalnya menjelang tidur. '
           'Hari kosong berarti belum diketahui. Isi 0 jika memang tidak menggunakan.',
         ),
-        if (c.uatProgramComplete)
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
-            child: Text(
-              'Periode selesai. Kamu dapat mengoreksi catatan yang sudah ada.',
-            ),
-          ),
         const SizedBox(height: 20),
         DropdownButtonFormField<String>(
           initialValue: _day,
@@ -135,22 +115,17 @@ class _ReductionDiaryState extends State<ReductionDiary> {
           },
         ),
         const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          key: ValueKey('record-product-$_day'),
-          initialValue: _product,
-          decoration: const InputDecoration(
-            labelText: 'Jenis penggunaan pada hari ini',
+        // The product follows the user's choice; "keduanya" gets two
+        // separate numbers. A day saved under another choice keeps it.
+        if (_product != c.nicotineProduct)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              'Catatan tanggal ini disimpan sebagai: '
+              '${nicotineProductLabels[_product]?.toLowerCase()}.',
+              style: TextStyle(color: context.colors.muted),
+            ),
           ),
-          items: [
-            for (final entry in nicotineProductLabels.entries)
-              DropdownMenuItem(value: entry.key, child: Text(entry.value)),
-          ],
-          onChanged: (value) => setState(() {
-            _product = value;
-            _confirmed = false;
-          }),
-        ),
-        const SizedBox(height: 16),
         if (productsFor(_product).contains('cigarette')) ...[
           TextField(
             controller: _cigarettes,
@@ -171,8 +146,10 @@ class _ReductionDiaryState extends State<ReductionDiary> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Satu sesi = satu momen memakai vape, sampai alat disimpan dan kamu beralih aktivitas. '
-            'Pakai definisi yang sama setiap hari. Sesi bukan takaran nikotin dan tidak disetarakan dengan batang rokok.',
+            'Satu sesi = satu momen memakai vape, sampai alat disimpan dan '
+            'kamu beralih aktivitas. Pakai definisi yang sama setiap hari. '
+            'Sesi bukan takaran nikotin'
+            '${productsFor(_product).length > 1 ? ' dan tidak disetarakan dengan batang rokok' : ''}.',
             style: TextStyle(color: context.colors.muted),
           ),
           const SizedBox(height: 16),

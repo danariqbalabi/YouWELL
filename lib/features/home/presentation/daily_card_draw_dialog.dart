@@ -36,20 +36,6 @@ class _DailyCardDrawDialogState extends State<DailyCardDrawDialog> {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.controller,
     builder: (context, _) {
-      if (widget.controller.uatProgramComplete) {
-        return AlertDialog(
-          title: const Text('Perjalanan 28 hari selesai'),
-          content: const Text(
-            'Challenge harian sudah selesai. Kamu bisa melihat rekap dan riwayat perjalananmu.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Lihat rekap'),
-            ),
-          ],
-        );
-      }
       final compact = MediaQuery.sizeOf(context).width < 600;
       return Dialog(
         insetPadding: EdgeInsets.symmetric(

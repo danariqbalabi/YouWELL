@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youwell/app/youwell_app.dart';
 import 'package:youwell/application/wellness_controller.dart';
 import 'package:youwell/features/home/presentation/home_page.dart';
-import 'package:youwell/features/reduction/presentation/habit_swap_panel.dart';
 
 void main() {
   for (final mode in ['light', 'dark']) {
@@ -47,7 +46,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(controller.reduction, isTrue);
         controller.setNicotineProduct('cigarette');
+        await tester.pumpAndSettle();
         expect(find.text('Buka Habit Swap'), findsOneWidget);
+        expect(find.textContaining('Saya merokok'), findsOneWidget);
         expect(
           WellnessController(saved: controller.export()).reduction,
           isTrue,
@@ -56,80 +57,57 @@ void main() {
 
         await tester.pageBack();
         await tester.pumpAndSettle();
-        await tester.scrollUntilVisible(find.text('Kurangi rokok / vape'), 150);
-        expect(find.text('Kurangi rokok / vape'), findsOneWidget);
-        // The reduction card sits after today's quests on Home.
+        // A cigarette-only user sees cigarette words only.
+        await tester.scrollUntilVisible(find.text('Kurangi rokok'), 150);
         expect(
           find.descendant(
             of: find.byType(HomePage),
-            matching: find.text('Kurangi rokok / vape'),
+            matching: find.text('Kurangi rokok'),
           ),
           findsOneWidget,
         );
-        await tester.ensureVisible(find.text('Buka Habit Swap'));
+        expect(find.textContaining('vape'), findsNothing);
+        await tester.ensureVisible(find.text('Saya ingin merokok'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Buka Habit Swap'));
+        await tester.tap(find.text('Saya ingin merokok'));
         await tester.pumpAndSettle();
-        expect(find.text('Rokok / vape'), findsOneWidget);
+
+        // One-time setup: choices, not a report of anything done.
+        expect(find.text('Persiapan singkat'), findsOneWidget);
+        await tapIn(tester, 'Setelah makan');
+        await tapIn(tester, 'Lanjut');
+        await tapIn(tester, 'Jalan santai');
+        await tapIn(tester, 'Lanjut');
+        await tapIn(tester, 'Simpan pilihan saya');
+        expect(controller.habitSwaps, isEmpty);
+        expect(controller.swapSetup('cigarette')!['activities'], ['walk']);
+
+        // The craving flow puts personal picks first; no countdown.
+        expect(find.text('Coba lakukan satu kegiatan dulu'), findsOneWidget);
         expect(find.text('Mulai'), findsNothing);
-        expect(find.text('02:00'), findsNothing);
-        await tester.tap(find.text('Setelah makan'));
-        await tester.scrollUntilVisible(
-          find.text('Jalan santai'),
-          150,
-          scrollable: find
-              .descendant(
-                of: find.byType(HabitSwapPanel),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Jalan santai'));
-        await tester.scrollUntilVisible(
-          find.text('Sudah coba, tetap merokok'),
-          150,
-          scrollable: find
-              .descendant(
-                of: find.byType(HabitSwapPanel),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Sudah coba, tetap merokok'));
-        await tester.scrollUntilVisible(
-          find.text('Simpan momen'),
-          150,
-          scrollable: find
-              .descendant(
-                of: find.byType(HabitSwapPanel),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Simpan momen'));
-        await tester.pumpAndSettle();
-        expect(controller.habitSwapsToday, 1);
-        expect(
-          find.text('Momen tercatat. Terima kasih sudah jujur!'),
-          findsOneWidget,
-        );
+        await tapIn(tester, 'Jalan santai');
+        await tapIn(tester, 'Saya akan coba');
+        expect(controller.activeSwapMoment, isNotNull);
+        expect(controller.habitSwaps, isEmpty, reason: 'not tried yet');
+        await tapIn(tester, 'Saya sudah mencoba');
+        expect(controller.swapAttemptsToday, hasLength(1));
+        await tapIn(tester, 'Akhirnya tetap merokok');
+        await tapIn(tester, 'Simpan hasil');
+        expect(controller.habitSwaps.single['outcome'], 'used');
+        expect(find.textContaining('Mencoba tetap berarti'), findsOneWidget);
 
         await tester.pageBack();
         await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
-          find.text('aktivitas dicoba hari ini'),
+          find.text('1 kali mencoba kegiatan pengganti hari ini'),
           150,
         );
-        expect(find.text('aktivitas dicoba hari ini'), findsOneWidget);
         controller.switchPath(false);
         await tester.pumpAndSettle();
         expect(
           find.descendant(
             of: find.byType(HomePage),
-            matching: find.text('Kurangi rokok / vape'),
+            matching: find.text('Kurangi rokok'),
           ),
           findsNothing,
         );
@@ -140,4 +118,25 @@ void main() {
       },
     );
   }
+}
+
+/// Scrolls the visible vertical list until [text] shows, then taps it.
+Future<void> tapIn(WidgetTester tester, String text) async {
+  final target = find.text(text).hitTestable();
+  if (target.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      find.text(text),
+      120,
+      scrollable: find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          )
+          .last,
+    );
+    await tester.pumpAndSettle();
+  }
+  await tester.tap(find.text(text).last);
+  await tester.pumpAndSettle();
 }

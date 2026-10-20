@@ -18,7 +18,6 @@ extension ReductionSupport on WellnessController {
 
   bool setNicotineProduct(String value) {
     if (!reduction ||
-        uatProgramComplete ||
         !nicotineProductLabels.containsKey(value)) {
       return false;
     }
@@ -48,7 +47,6 @@ extension ReductionSupport on WellnessController {
         : {...activities, if (activity.isNotEmpty) activity}.toList();
     final causes = {...triggers, if (trigger.isNotEmpty) trigger}.toList();
     if ((!reduction && !hasOpenHabitSwapMission) ||
-        uatProgramComplete ||
         eventId.isEmpty ||
         eventId.length > 100 ||
         !const ['cigarette', 'vape'].contains(product) ||
@@ -79,8 +77,181 @@ extension ReductionSupport on WellnessController {
     return true;
   }
 
+  // ---------------------------------------------------------------------
+  // One-time setup: personal triggers and activities per product. This is
+  // a list of choices, never a report that anything was done.
+
+  /// Saved choices for [product], or the older single plan read as setup.
+  JsonMap? swapSetup(String product) {
+    final value = (_data['reductionSetup'] as Map?)?[product];
+    if (value is Map) return Map<String, dynamic>.from(value);
+    final plan = swapPlan(product);
+    if (plan == null) return null;
+    return {
+      'triggers': momentTriggers(plan),
+      'activities': [if (plan['activity'] is String) plan['activity']],
+      'savedOn': plan['chosenOn'],
+    };
+  }
+
+  /// Products still without setup, unless the user chose "pilih nanti".
+  List<String> get productsNeedingSetup =>
+      (_data['reductionSettings'] as Map?)?['setupDeferred'] == true
+      ? const []
+      : [
+          for (final product in productsFor(nicotineProduct))
+            if (swapSetup(product) == null) product,
+        ];
+
+  bool saveSwapSetup(
+    String product, {
+    List<String> triggers = const [],
+    List<String> customTriggers = const [],
+    List<String> activities = const [],
+    List<String> customActivities = const [],
+  }) {
+    if (!productsFor(nicotineProduct).contains(product) ||
+        !triggers.every(triggersFor(product).contains) ||
+        !activities.every(swapActivityLabels.containsKey)) {
+      return false;
+    }
+    (_data['reductionSetup'] ??= <String, dynamic>{})[product] = {
+      'triggers': triggers.toSet().toList(),
+      'customTriggers': cleanCustom(customTriggers),
+      'activities': activities.toSet().toList(),
+      'customActivities': cleanCustom(customActivities),
+      'savedOn': today,
+    };
+    _save();
+    return true;
+  }
+
+  /// "Belum yakin, pilih nanti": help is never blocked by the setup.
+  void deferSwapSetup() {
+    _data['reductionSettings'] = {
+      ...?(_data['reductionSettings'] as Map?),
+      'setupDeferred': true,
+    };
+    _save();
+  }
+
+  // ---------------------------------------------------------------------
+  // A moment: "Saya akan coba" starts it, "Saya sudah mencoba" reports the
+  // try (mission + XP once), and the outcome may follow now or later. A
+  // started moment lives on this device only and is never synced.
+
+  JsonMap? get activeSwapMoment {
+    final value = _data['activeSwapMoment'];
+    return value is Map ? Map<String, dynamic>.from(value) : null;
+  }
+
+  /// False while another moment is open: resume or cancel it first.
+  bool startSwapMoment({
+    required String product,
+    List<String> activities = const [],
+    List<String> customActivities = const [],
+  }) {
+    final custom = cleanCustom(customActivities);
+    if (activeSwapMoment != null ||
+        !productsFor(nicotineProduct).contains(product) ||
+        !activities.every(swapActivityLabels.containsKey) ||
+        (activities.isEmpty && custom.isEmpty)) {
+      return false;
+    }
+    _data['activeSwapMoment'] = {
+      'eventId': 'moment-${now.microsecondsSinceEpoch}',
+      'product': product,
+      'activities': activities.toSet().toList(),
+      'customActivities': custom,
+      'startedAt': now.toIso8601String(),
+    };
+    _save();
+    return true;
+  }
+
+  void cancelSwapMoment() {
+    if (_data.remove('activeSwapMoment') != null) _save();
+  }
+
+  /// Turns the open moment into a tried record; returns its id. Optional
+  /// [triggers] note what set the moment off.
+  String? reportSwapTried({
+    List<String> triggers = const [],
+    List<String> customTriggers = const [],
+  }) {
+    final moment = activeSwapMoment;
+    if (moment == null) return null;
+    final product = moment['product'].toString();
+    final known = triggers.where(triggersFor(product).contains).toList();
+    final activities = (moment['activities'] as List).cast<String>();
+    final custom = (moment['customActivities'] as List).cast<String>();
+    _data.remove('activeSwapMoment');
+    _add('habitSwaps', {
+      'eventId': moment['eventId'],
+      'product': product,
+      'trigger': known.firstOrNull,
+      if (known.length > 1) 'triggers': known,
+      if (cleanCustom(customTriggers).isNotEmpty)
+        'customTriggers': cleanCustom(customTriggers),
+      'activity': activities.firstOrNull,
+      'activities': activities,
+      if (custom.isNotEmpty) 'customActivities': custom,
+      'swap': [
+        for (final key in activities) swapActivityLabels[key],
+        ...custom,
+      ].join(', '),
+      'tried': true,
+      'status': 'awaiting',
+      'outcome': null,
+      'startedAt': moment['startedAt'],
+    });
+    _applyHabitSwapEvidence();
+    return (_data['habitSwaps'] as List).last['id'].toString();
+  }
+
+  List<JsonMap> get swapsAwaitingOutcome =>
+      habitSwaps.where(awaitingOutcome).toList();
+
+  /// [outcome] is 'skipped' or 'used'; "isi nanti" simply leaves it open.
+  /// With both products, [usedProduct] records what was actually used.
+  bool recordSwapOutcome(
+    String swapId,
+    String outcome, {
+    String? usedProduct,
+  }) {
+    final rows = _data['habitSwaps'] as List;
+    final index = rows.indexWhere((row) => row['id'] == swapId);
+    if (index < 0 ||
+        !const ['skipped', 'used'].contains(outcome) ||
+        (usedProduct != null &&
+            (outcome != 'used' ||
+                !productsFor(nicotineProduct).contains(usedProduct)))) {
+      return false;
+    }
+    rows[index] = {
+      ...rows[index] as Map,
+      'outcome': outcome,
+      'status': 'done',
+      'resultAt': now.toIso8601String(),
+      if (usedProduct != null && usedProduct != rows[index]['product'])
+        'usedProduct': usedProduct,
+    };
+    _save();
+    return true;
+  }
+
+  /// The day's own confirmed totals decide "no smoking/vaping today"; a
+  /// skipped moment never does. Null while a product is unconfirmed.
+  bool? dayWithoutUse(String day) {
+    final row = nicotineDay(day);
+    final products = productsFor(nicotineProduct);
+    if (row == null || products.isEmpty) return null;
+    if (products.any((product) => row[product] is! num)) return null;
+    return products.every((product) => row[product] == 0);
+  }
+
   void _applyHabitSwapEvidence() {
-    if (uatProgramComplete || swapAttemptsToday.isEmpty) return;
+    if (swapAttemptsToday.isEmpty) return;
     final task = quests
         .where(
           (task) =>
@@ -105,7 +276,6 @@ extension ReductionSupport on WellnessController {
   /// [triggers]: the first is kept as `trigger` for older readers.
   bool setSwapPlan(String product, List<String> triggers, String activity) {
     if (!reduction ||
-        uatProgramComplete ||
         !productsFor(nicotineProduct).contains(product) ||
         triggers.isEmpty ||
         !triggers.every(triggersFor(product).contains) ||
@@ -142,8 +312,7 @@ extension ReductionSupport on WellnessController {
         activeProducts.isEmpty ||
         day.compareTo(start) < 0 ||
         day.compareTo(today) > 0 ||
-        daysBetweenKeys(start, day) >= 28 ||
-        (uatProgramComplete && nicotineDay(day) == null)) {
+        day.compareTo(start) < 0) {
       return false;
     }
     final values = {'cigarette': cigarettes, 'vape': vapeSessions};
@@ -177,7 +346,6 @@ extension ReductionSupport on WellnessController {
     final week = uatProgram?.week ?? 1;
     final baseline = consumptionWeek(1);
     if (!reduction ||
-        uatProgramComplete ||
         week == 1 ||
         !productsFor(nicotineProduct).contains(product) ||
         !baseline.comparableFor(product) ||

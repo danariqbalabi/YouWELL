@@ -149,21 +149,17 @@ void main() {
             sim.nextDay();
           }
           expect(sim.controller.wellnessProgramComplete, isTrue);
-          expect(sim.controller.needsDailyCardDraw, isFalse);
-          expect(sim.controller.days, hasLength(28));
-          expect(sim.controller.ladderOffers, isEmpty);
-          expect(sim.controller.chooseRecommendedDailyCard(), isFalse);
-          expect(sim.controller.commitDailyCardPack(), isFalse);
-          expect(sim.controller.drawBonusCard(), isFalse);
+          // Day 29 onwards: the app keeps working (decision 20 Oct 2026),
+          // but the research weeks still count only days 1-28.
+          expect(sim.controller.needsDailyCardDraw, isTrue);
           final xp = sim.controller.xp;
-          final count = sim.controller.workoutSessions.length;
-          sim.controller.recordWorkout(kind: 'walk', seconds: 600, meters: 800);
-          sim.controller.recordMeal(photoCaptured: true);
-          sim.controller.addWater();
+          sim.takeCard();
+          for (final task in sim.controller.coreQuests) {
+            sim.finish(task);
+          }
+          expect(sim.controller.xp, greaterThan(xp));
           sim.nextDay();
-          expect(sim.controller.xp, xp);
-          expect(sim.controller.workoutSessions, hasLength(count));
-          expect(sim.controller.days, hasLength(28));
+          expect(sim.controller.days, hasLength(30));
           expect(
             [
               for (var week = 1; week <= 4; week++)
@@ -226,7 +222,9 @@ void main() {
       sim.now = DateTime(2026, 11, 21);
       sim.controller.prepareToday();
       await tester.pumpAndSettle();
-      expect(find.text('Perjalanan 28 hari selesai'), findsOneWidget);
+      // Day 29 deals a fresh deck instead of closing the draw.
+      expect(sim.controller.needsDailyCardDraw, isTrue);
+      expect(sim.controller.dailyDrawCards, isNotEmpty);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },
@@ -504,8 +502,8 @@ void main() {
       expect(sim.controller.uatProgram, isNotNull);
       sim.now = sim.now.add(const Duration(days: 28));
       sim.controller.prepareToday();
-      expect(sim.controller.needsDailyCardDraw, isFalse);
-      expect(sim.controller.uatProgramComplete, isTrue);
+      expect(sim.controller.studyPeriodComplete, isTrue);
+      expect(sim.controller.needsDailyCardDraw, isTrue);
       expect(
         sim.cards.every((c) => sim.categoriesOf(c).contains('Reduction')),
         isTrue,
@@ -542,7 +540,7 @@ void main() {
   });
 
   testWidgets(
-    'After day 28 the app shows a recap and no new activity actions',
+    'After day 28 the app notes the recap and keeps every action available',
     (tester) async {
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1;
@@ -553,16 +551,17 @@ void main() {
       sim.now = sim.now.add(const Duration(days: 28));
       sim.controller.prepareToday();
       sim.controller.setReduceMotion(true);
+      expect(sim.controller.needsDailyCardDraw, isTrue);
+      sim.takeCard();
+      expect(sim.controller.coreQuests, isNotEmpty);
       await tester.pumpWidget(
         YouWellApp(controller: sim.controller, surface: AppSurface.mobile),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Perjalanan 28 hari selesai'), findsOneWidget);
-      expect(find.byType(DailyCardDrawDialog), findsNothing);
+      expect(find.textContaining('Periode 28 hari selesai'), findsOneWidget);
       await tester.tap(find.byType(NavigationDestination).at(1));
       await tester.pumpAndSettle();
-      expect(find.text('Riwayat aktivitas'), findsOneWidget);
-      expect(find.text('Jalan atau lari'), findsNothing);
+      expect(find.text('Jalan atau lari'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },

@@ -21,6 +21,7 @@ class CommunityPost {
     this.moderationNote,
     this.imagePath,
     this.imageUrl,
+    this.createdAt,
   });
 
   factory CommunityPost.fromJson(Map value) => CommunityPost(
@@ -37,6 +38,9 @@ class CommunityPost {
     reported: value['reported'] == true,
     moderationNote: value['moderation_note']?.toString(),
     imagePath: value['image_path']?.toString(),
+    createdAt: DateTime.tryParse(
+      (value['created_at'] ?? value['time'] ?? '').toString(),
+    ),
   );
 
   CommunityPost withImageUrl(String? url) => CommunityPost(
@@ -52,6 +56,7 @@ class CommunityPost {
     moderationNote: moderationNote,
     imagePath: imagePath,
     imageUrl: url,
+    createdAt: createdAt,
   );
 
   final String id, alias, body, status;
@@ -63,6 +68,9 @@ class CommunityPost {
 
   /// Storage path of the post's photo, and a short-lived link to show it.
   final String? imagePath, imageUrl;
+
+  /// When the post was sent; the cursor for older published pages.
+  final DateTime? createdAt;
 }
 
 class CommunityReport {
@@ -126,4 +134,13 @@ abstract interface class CommunityStore {
 
   /// Admin only: removes any post, with its photo, reactions and reports.
   Future<void> adminDeletePost(String postId);
+
+  /// Admin only: published posts, newest first, matching [query] on alias
+  /// or text. Pass the last post's [CommunityPost.createdAt] as [before]
+  /// for the next page.
+  Future<List<CommunityPost>> publishedPosts({
+    String query = '',
+    DateTime? before,
+    int limit = 30,
+  });
 }
