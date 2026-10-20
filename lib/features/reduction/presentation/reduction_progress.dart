@@ -29,13 +29,6 @@ class ReductionProgress extends StatelessWidget {
               : 'Minggu $currentWeek · langkah kecil',
           style: Theme.of(context).textTheme.headlineSmall,
         ),
-        const SizedBox(height: 8),
-        Text(switch (currentWeek) {
-          1 => 'Kenali pola awal dan pemicu. Catat konsumsi apa adanya.',
-          2 => 'Pilih satu momen untuk diubah. Target jumlah bersifat pilihan.',
-          3 => 'Ulangi yang cocok. Target tidak diturunkan otomatis.',
-          _ => 'Pertahankan yang cocok dan lihat kembali catatanmu.',
-        }),
         const SizedBox(height: 16),
         const Text(
           'Rata-rata memakai hari yang totalnya sudah dikonfirmasi. '
